@@ -25,7 +25,11 @@ import {
 	type ImageElement,
 } from "@/components/slate/img/types";
 import { createDefaultTable } from "@/components/slate/table/utils";
-// import { uploadImageFile } from "@/lib/uploadImage";
+import {
+	chooseImageFile,
+	uploadEditorImage,
+	validateImageFile,
+} from "@/components/slate/img/upload";
 
 type CustomText = {
 	text: string;
@@ -225,37 +229,6 @@ export function insertImage(
 	});
 }
 
-// function openImageFilePicker(
-// 	editor: EditorCommandEditor,
-// ) {
-// 	const input = document.createElement("input");
-// 	input.type = "file";
-// 	input.accept = "image/*";
-
-// 	input.onchange = async () => {
-// 		const file = input.files?.[0];
-// 		if (!file) return;
-
-// 		try {
-// 			const url = await uploadImageFile(file);
-// 			insertImage(editor, url, file.name);
-// 			ReactEditor.focus(editor);
-// 		} catch (error) {
-// 			console.error(
-// 				"Failed to upload image",
-// 				error,
-// 			);
-// 			window.alert(
-// 				error instanceof Error
-// 					? error.message
-// 					: "Could not upload this image.",
-// 			);
-// 		}
-// 	};
-
-// 	input.click();
-// }
-
 function insertVoidBlock(
 	editor: Editor,
 	node: Record<string, unknown>,
@@ -326,19 +299,58 @@ export function promptAndInsertEmbed(
 	ReactEditor.focus(editor);
 }
 
-export function pickImageAndInsert(
+/**
+ * Pick a local image, show it immediately from a local preview URL, and swap
+ * in the uploaded URL once the upload finishes (removing it on failure).
+ */
+export async function pickImageAndInsert(
 	editor: EditorCommandEditor,
 ) {
-	// const url = window.prompt(
-	// 	"Paste an image URL (leave empty to upload a file)",
-	// );
-	// if (url === null) return;
-	// if (url.trim()) {
-	// 	insertImage(editor, url.trim());
-	// 	ReactEditor.focus(editor);
-	// 	return;
-	// }
-	// openImageFilePicker(editor);
+	const file = await chooseImageFile();
+	if (!file) return;
+
+	try {
+		validateImageFile(file);
+	} catch (error) {
+		window.alert((error as Error).message);
+		return;
+	}
+
+	const uploadId = crypto.randomUUID();
+	const previewUrl = URL.createObjectURL(file);
+	const image: ImageElement = {
+		type: "image",
+		url: previewUrl,
+		alt: file.name,
+		align: DEFAULT_IMAGE_ALIGN,
+		uploadId,
+		children: [{ text: "" }],
+	};
+	insertVoidBlock(editor, image);
+	ReactEditor.focus(editor);
+
+	const matchUpload = (node: unknown) =>
+		SlateElement.isElement(node) &&
+		(node as { uploadId?: string }).uploadId === uploadId;
+
+	try {
+		const url = await uploadEditorImage(file);
+		Transforms.setNodes(editor, { url } as Partial<ImageElement>, {
+			at: [],
+			match: matchUpload,
+		});
+		Transforms.unsetNodes(editor, "uploadId", {
+			at: [],
+			match: matchUpload,
+		});
+	} catch (error) {
+		Transforms.removeNodes(editor, { at: [], match: matchUpload });
+		window.alert(
+			error instanceof Error ? error.message : "Could not upload this image.",
+		);
+	} finally {
+		URL.revokeObjectURL(previewUrl);
+	}
 }
 
 export function setParagraph(editor: Editor) {

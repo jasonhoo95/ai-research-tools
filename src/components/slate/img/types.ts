@@ -7,6 +7,8 @@ export type ImageElement = {
   caption?: string;
   width?: number;
   align?: ImageAlign;
+  /** Set while the file is uploading; `url` is a local preview until then. */
+  uploadId?: string;
   children: [{ text: "" }];
 };
 

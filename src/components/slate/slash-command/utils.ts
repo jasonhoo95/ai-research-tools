@@ -36,14 +36,13 @@ export function getSlashCommandContext(
   if (!match?.[1]) return null;
 
   const token = match[1];
-  const charsBeforeToken = beforeText.length - token.length;
-  const tokenStart =
-    charsBeforeToken === 0
-      ? start
-      : Editor.after(editor, start, {
-          unit: "character",
-          distance: charsBeforeToken,
-        });
+  // Walk back from the caret over the token itself. Counting forward from the
+  // block start breaks when an inline void (e.g. a formula) sits earlier in
+  // the line: it adds a position but no characters to Editor.string.
+  const tokenStart = Editor.before(editor, selection.anchor, {
+    unit: "character",
+    distance: token.length,
+  });
 
   if (!tokenStart) return null;
 
