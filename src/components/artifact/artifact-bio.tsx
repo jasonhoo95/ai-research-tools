@@ -5,6 +5,7 @@ import type { Descendant } from "slate"
 import {
   Award,
   Briefcase,
+  Camera,
   FileText,
   FolderKanban,
   GraduationCap,
@@ -27,6 +28,7 @@ import type {
 } from "@/lib/chat-types"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
 import { chatRepo } from "@/lib/chat-repo"
+import { ImageUploadDialog } from "@/components/artifact/image-upload-dialog"
 
 const SAVE_DELAY_MS = 600
 
@@ -281,6 +283,15 @@ export function ArtifactBio({
 
   const [bannerFailed, setBannerFailed] = React.useState(false)
   const [avatarFailed, setAvatarFailed] = React.useState(false)
+  const [imageDialog, setImageDialog] = React.useState<"banner" | "avatar" | null>(null)
+  // Generated and uploaded images for this profile share one storage folder.
+  const imageFolder = `bio/${(data as unknown as StoredArtifactRow).content.id}`
+
+  const setImage = (field: "bannerUrl" | "avatarUrl", url: string | undefined) => {
+    if (field === "bannerUrl") setBannerFailed(false)
+    else setAvatarFailed(false)
+    commit((prev) => ({ ...prev, [field]: url }))
+  }
   const gradient = `linear-gradient(135deg, ${bio.palette?.from ?? "#0a66c2"}, ${bio.palette?.to ?? "#004182"})`
 
   return (
@@ -310,10 +321,23 @@ export function ArtifactBio({
                   className="absolute inset-0 size-full object-cover"
                 />
               )}
+              <button
+                type="button"
+                onClick={() => setImageDialog("banner")}
+                className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm backdrop-blur transition hover:bg-white"
+              >
+                <Camera className="size-3.5" />
+                Edit cover
+              </button>
             </div>
 
             <div className="relative px-4 pb-5 sm:px-6">
-              <div className="-mt-[72px] mb-3 size-[120px] overflow-hidden rounded-full border-4 border-card bg-card shadow-sm sm:-mt-[84px] sm:size-[152px]">
+              <button
+                type="button"
+                onClick={() => setImageDialog("avatar")}
+                aria-label="Change profile photo"
+                className="group/avatar relative -mt-[72px] mb-3 block size-[120px] overflow-hidden rounded-full border-4 border-card bg-card shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:-mt-[84px] sm:size-[152px]"
+              >
                 {bio.avatarUrl && !avatarFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -330,7 +354,11 @@ export function ArtifactBio({
                     {initials(bio.name)}
                   </div>
                 )}
-              </div>
+                <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/45 text-xs font-semibold text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
+                  <Camera className="size-5" />
+                  Change photo
+                </span>
+              </button>
 
               <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,220px)]">
                 <div className="min-w-0">
@@ -473,6 +501,21 @@ export function ArtifactBio({
           </div>
         </aside>
       </div>
+
+      <ImageUploadDialog
+        open={imageDialog !== null}
+        onOpenChange={(open) => !open && setImageDialog(null)}
+        title={imageDialog === "banner" ? "Change cover image" : "Change profile photo"}
+        shape={imageDialog === "banner" ? "banner" : "avatar"}
+        folder={imageFolder}
+        currentUrl={imageDialog === "banner" ? bio.bannerUrl : bio.avatarUrl}
+        onSelect={(url) =>
+          setImage(imageDialog === "banner" ? "bannerUrl" : "avatarUrl", url)
+        }
+        onRemove={() =>
+          setImage(imageDialog === "banner" ? "bannerUrl" : "avatarUrl", undefined)
+        }
+      />
     </div>
   )
 }
