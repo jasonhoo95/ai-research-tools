@@ -59,8 +59,11 @@ export interface SlideDeckSlide {
 	title: string;
 	/** Legacy bullet list (used when `content` is absent). */
 	bullets?: string[];
-	/** Markdown body rendered in the slide editor. */
-	content?: string;
+	/**
+	 * Markdown body when first generated; Slate document once the slide has
+	 * been edited.
+	 */
+	content?: string | Descendant[];
 	notes?: string;
 }
 
@@ -68,6 +71,8 @@ export interface SlideArtifact {
 	kind: "slide";
 	title: string;
 	slides: SlideDeckSlide[];
+	/** Deck theme id (see components/artifact/slide-themes); defaults to "midnight". */
+	theme?: "midnight" | "paper" | "aurora";
 }
 
 export interface NotesboardNote {

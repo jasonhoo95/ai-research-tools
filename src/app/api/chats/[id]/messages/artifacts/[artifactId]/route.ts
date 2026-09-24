@@ -59,8 +59,9 @@ export async function PATCH(
 
 	try {
 		const body = await request.json();
+		// Resolves panel row ids and message artifact ids alike.
 		const upstream = await api.patch(
-			`/chats/${id}/artifacts/${artifactId}`,
+			`/chats/${id}/messages/artifacts/${artifactId}`,
 			{ content: body },
 			{
 				headers: headersFromIncoming(

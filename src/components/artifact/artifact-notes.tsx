@@ -10,46 +10,82 @@ import type { NotesArtifact } from "@/lib/chat-types"
 import { useArtifactStore } from "@/store/artifact-stores"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
 import { chatRepo } from "@/lib/chat-repo"
-function NotesMarkdownEditor({ data, markdown }: { data: MessageArtifactResult, markdown: string }) {
-    // const document = React.useMemo<Descendant[]>(
-    //     () => markdownToSlateDocument(markdown),
-    //     [markdown],
-    // )
+
+const SAVE_DELAY_MS = 600
+
+/** Raw chatbot_message row returned by the message-artifact endpoint. */
+type StoredArtifactRow = {
+    id: string
+    parent_chatbot_id: string
+    content: { id: string; artifact: NotesArtifact }
+}
+
+function toArtifactData(row: StoredArtifactRow, content: unknown) {
+    return {
+        id: row.content.id,
+        artifact: {
+            ...row.content.artifact,
+            content,
+        },
+    }
+}
+
+function NotesMarkdownEditor({ data, markdown }: { data: MessageArtifactResult, markdown: string | Descendant[] }) {
+    const row = data as unknown as StoredArtifactRow
+    // Content is markdown until the note is first edited, then a Slate document.
+    const document = React.useMemo<Descendant[]>(
+        () => (Array.isArray(markdown) ? markdown : markdownToSlateDocument(markdown.trim())),
+        [markdown],
+    )
+    const valueRef = React.useRef<Descendant[] | null>(null)
+    const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+    const lastSavedRef = React.useRef<string | null>(null)
+
+    const saveNow = React.useCallback(() => {
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current)
+            saveTimerRef.current = null
+        }
+        if (!valueRef.current) return
+
+        const artifactData = toArtifactData(row, valueRef.current)
+        const serialized = JSON.stringify(artifactData)
+        if (serialized === lastSavedRef.current) return
+        lastSavedRef.current = serialized
+
+        chatRepo
+            .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+            .catch((err) => {
+                lastSavedRef.current = null
+                console.error("Failed to save notes", err)
+            })
+    }, [row])
+
+    // Content last loaded or saved — selection-only changes match it.
+    const baselineRef = React.useRef(JSON.stringify(document))
 
     const handleChange = React.useCallback((value: Descendant[]) => {
-        const next = value
-        console.log("next", next);
-        const artifactData = {
-            id: data.content.id,
-            artifact: {
-                ...data.content.artifact,
-                content: next,
-            }
+        // Slate fires onChange for clicks and caret moves with a fresh array,
+        // so compare content rather than identity.
+        const serialized = JSON.stringify(value)
+        if (serialized === baselineRef.current) return
+        baselineRef.current = serialized
+        valueRef.current = value
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = setTimeout(saveNow, SAVE_DELAY_MS)
+    }, [saveNow])
 
-        }
-        console.log("data content", artifactData);
-        chatRepo.updateMessageArtifact(data.parent_chatbot_id, data.id, {
-            ...artifactData,
-        })
-        // const { currentArtifactId, artifacts, updateArtifact } =
-        //     useArtifactStore.getState()
-        // if (!currentArtifactId) return
-
-        // const entry = artifacts[currentArtifactId]
-        // if (!entry || entry.artifact.kind !== "notes") return
-        // if (entry.artifact.content === next) return
-
-        // updateArtifact(currentArtifactId, {
-        //     ...entry.artifact,
-        //     content: next,
-        // })
-
-        // console.log("artifact notes", artifacts)
-    }, [])
+    // Flush any pending edit when leaving the page.
+    React.useEffect(
+        () => () => {
+            if (saveTimerRef.current) saveNow()
+        },
+        [saveNow],
+    )
 
     return (
         <SlateEditor
-            value={markdown}
+            value={document}
             onChange={handleChange}
             showToolbar={false}
             enableSlashCommands={false}
@@ -62,11 +98,10 @@ function NotesMarkdownEditor({ data, markdown }: { data: MessageArtifactResult, 
 
 export function ArtifactNotes({ data, artifact }: { data: MessageArtifactResult, artifact: NotesArtifact }) {
     const artifactId = useArtifactStore((state) => state.currentArtifactId)
-    const markdown = artifact.content.length > 0 ? artifact.content : markdownToSlateDocument(artifact.content.trim())
 
     return (
         <div className="min-h-[240px] rounded-xl bg-muted/20 p-4 sm:p-6">
-            <NotesMarkdownEditor data={data} key={artifactId ?? "notes"} markdown={markdown} />
+            <NotesMarkdownEditor data={data} key={artifactId ?? "notes"} markdown={artifact.content} />
         </div>
     )
 }

@@ -11,6 +11,7 @@ import { chatRepo, type MessageArtifactResult } from "@/lib/chat-repo"
 import type { Artifact } from "@/lib/chat-types"
 import { useArtifactStore } from "@/store/artifact-stores"
 import { artifactKindLabel } from "@/lib/artifact-labels"
+import { artifactsStore } from "@/lib/artifacts-store"
 import { ArtifactChart } from "@/components/artifact/artifact-chart"
 import { ArtifactTable } from "@/components/artifact/artifact-table"
 import { ArtifactSlides } from "@/components/artifact/artifact-slides"
@@ -33,11 +34,40 @@ function artifactFromResult(data: MessageArtifactResult): Artifact | null {
 
 function isRenderableArtifact(value: unknown): value is Artifact {
   if (!value || typeof value !== "object") return false
-  const kind = (value as { kind?: unknown }).kind
-  return (
-    typeof kind === "string" &&
-    (KNOWN_KINDS as ReadonlyArray<string>).includes(kind)
-  )
+  const a = value as Record<string, unknown>
+  if (!(KNOWN_KINDS as ReadonlyArray<unknown>).includes(a.kind)) return false
+  // Older messages stored only { id, kind, title } — no renderable body.
+  switch (a.kind) {
+    case "chart":
+      return Array.isArray(a.data)
+    case "table":
+      return Array.isArray(a.columns) && Array.isArray(a.rows)
+    case "slide":
+      return Array.isArray(a.slides)
+    case "notesboard":
+      return Array.isArray(a.notes)
+    case "notes":
+      return typeof a.content === "string" || Array.isArray(a.content)
+    default:
+      return false
+  }
+}
+
+/**
+ * The editors save from `result.content.artifact`, so when the body comes
+ * from the local cache, graft it in — the first edit then writes the full
+ * artifact back to the backend.
+ */
+function withArtifact(
+  result: MessageArtifactResult,
+  artifact: Artifact,
+): MessageArtifactResult {
+  const row = result as unknown as { content?: Record<string, unknown> }
+  return {
+    ...result,
+    artifact,
+    content: { ...row.content, artifact },
+  } as MessageArtifactResult
 }
 
 /**
@@ -141,19 +171,30 @@ export default function ArtifactFromMessagePage() {
       </main>
     )
   }
-  const artifact = storedArtifact ?? artifactFromResult(result)
+  const fromBackend = artifactFromResult(result)
+  const cached = fromBackend ? null : artifactsStore.get(artifactId)?.artifact
+  const artifact =
+    storedArtifact ?? fromBackend ?? (isRenderableArtifact(cached) ? cached : null)
   if (!artifact) {
     return (
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center gap-4 p-8">
-        <h1 className="text-2xl font-semibold">Couldn&apos;t load artifact</h1>
+        <h1 className="text-2xl font-semibold">Artifact content unavailable</h1>
+        <p className="max-w-md text-center text-sm text-muted-foreground">
+          This artifact was created before its content was saved with the
+          chat, so only its title was kept. Ask the assistant to generate it
+          again to get an editable copy.
+        </p>
         <Button onClick={() => router.push(backHref)}>Back to chat</Button>
       </main>
     )
   }
+  const view = fromBackend ? result : withArtifact(result, artifact)
 
   const kindLabel = artifactKindLabel(artifact?.kind)
   const isWideLayout =
-    artifact.kind === "notesboard" || artifact.kind === "notes"
+    artifact.kind === "notesboard" ||
+    artifact.kind === "notes" ||
+    artifact.kind === "slide"
   const saveStatusLabel =
     artifact.kind === "notes"
       ? saveStatus === "pending" || saveStatus === "saving"
@@ -182,7 +223,12 @@ export default function ArtifactFromMessagePage() {
           <div className="mb-2 flex items-center gap-2">
             <Badge variant="secondary">{kindLabel}</Badge>
             <span className="text-xs text-muted-foreground">
-              Generated {new Date(result.messageCreatedAt).toLocaleString()}
+              Generated{" "}
+              {new Date(
+                view.messageCreatedAt ??
+                  (view as { created_at?: string }).created_at ??
+                  "",
+              ).toLocaleString()}
             </span>
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">{artifact.title}</h1>
@@ -211,11 +257,11 @@ export default function ArtifactFromMessagePage() {
       >
         {artifact.kind === "chart" && <ArtifactChart artifact={artifact} />}
         {artifact.kind === "table" && <ArtifactTable artifact={artifact} />}
-        {artifact.kind === "slide" && <ArtifactSlides artifact={artifact} />}
+        {artifact.kind === "slide" && <ArtifactSlides data={view} artifact={artifact} />}
         {artifact.kind === "notesboard" && (
-          <ArtifactNotesboard data={result} artifact={artifact} />
+          <ArtifactNotesboard data={view} artifact={artifact} />
         )}
-        {artifact.kind === "notes" && <ArtifactNotes data={result} artifact={artifact} />}
+        {artifact.kind === "notes" && <ArtifactNotes data={view} artifact={artifact} />}
       </div>
 
       {artifact.kind === "chart" && (
