@@ -61,6 +61,8 @@ type MasonryGridProps = {
         id: string,
         patch: Pick<MasonryItem, "label" | "body">,
     ) => void
+    /** When set, shows an "Add note" button in the toolbar. */
+    onAddItem?: () => void
     initialColumnCount?: number
     rowHeight?: number
     className?: string
@@ -342,6 +344,79 @@ function mergeItemsWithLayout(
 }
 
 /**
+ * Place items that aren't in the layout yet (e.g. newly added notes)
+ * at the bottom of the shortest column.
+ */
+function appendMissingToLayout(
+    layout: Layout,
+    items: MasonryItem[],
+    columnCount: number,
+): Layout {
+    const known = new Set(
+        layout.map((entry) => entry.i),
+    )
+
+    const missing = items.filter(
+        (item) => !known.has(item.id),
+    )
+
+    if (missing.length === 0) {
+        return layout
+    }
+
+    const columnHeights = Array.from(
+        { length: columnCount },
+        (_, column) =>
+            layout.reduce(
+                (bottom, entry) =>
+                    column >= entry.x &&
+                    column < entry.x + entry.w
+                        ? Math.max(
+                            bottom,
+                            entry.y + entry.h,
+                        )
+                        : bottom,
+                0,
+            ),
+    )
+
+    const added = createLayout(
+        missing,
+        columnCount,
+    ).map((entry) => {
+        const columnIndex =
+            columnHeights.indexOf(
+                Math.min(...columnHeights),
+            )
+
+        const x = Math.min(
+            columnIndex,
+            Math.max(0, columnCount - entry.w),
+        )
+
+        const y = Math.max(
+            ...columnHeights.slice(
+                x,
+                x + entry.w,
+            ),
+        )
+
+        for (
+            let column = x;
+            column < x + entry.w;
+            column++
+        ) {
+            columnHeights[column] =
+                y + entry.h
+        }
+
+        return { ...entry, x, y }
+    })
+
+    return [...layout, ...added]
+}
+
+/**
  * When reducing the number of columns,
  * make sure every item still fits.
  */
@@ -549,6 +624,7 @@ export function NotesGrid({
     onColumnsChange,
     onLayoutCommit,
     onItemChange,
+    onAddItem,
     initialColumnCount = 4,
     rowHeight = ROW_HEIGHT,
     className,
@@ -577,6 +653,19 @@ export function NotesGrid({
                 ),
             ),
         )
+
+    /**
+     * Give newly added items a slot in the grid.
+     */
+    useEffect(() => {
+        setLayout((prev) =>
+            appendMissingToLayout(
+                prev,
+                items,
+                columnCount,
+            ),
+        )
+    }, [items, columnCount])
 
     const itemMap = useMemo(
         () =>
@@ -710,6 +799,19 @@ export function NotesGrid({
         >
             {/* Column controls */}
             <div className="flex items-center justify-end gap-2">
+                {onAddItem ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mr-auto"
+                        onClick={onAddItem}
+                    >
+                        <Plus className="size-4" />
+                        Add note
+                    </Button>
+                ) : null}
+
                 <span className="mr-1 text-sm text-muted-foreground">
                     {columnCount}{" "}
                     {columnCount === 1

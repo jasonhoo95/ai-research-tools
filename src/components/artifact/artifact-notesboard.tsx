@@ -158,6 +158,21 @@ export function ArtifactNotesboard({
     [handleReorder, scheduleSave],
   )
 
+  const handleAddNote = React.useCallback(() => {
+    const index = itemsRef.current.length
+    handleReorder([
+      ...itemsRef.current,
+      {
+        id: `note-new-${crypto.randomUUID()}`,
+        label: "Untitled note",
+        body: [{ type: "paragraph", children: [{ text: "" }] }],
+        shadeClass: SHADE_CLASSES[index % SHADE_CLASSES.length],
+        h: 4,
+      },
+    ])
+    scheduleSave()
+  }, [handleReorder, scheduleSave])
+
   const handleColumnsChange = React.useCallback(
     (count: number) => {
       columnCountRef.current = count
@@ -166,14 +181,6 @@ export function ArtifactNotesboard({
     [scheduleSave],
   )
 
-  if (artifact.notes.length === 0) {
-    return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No notes in this board yet.
-      </p>
-    )
-  }
-
   return (
     <NotesGrid
       items={items}
@@ -181,6 +188,7 @@ export function ArtifactNotesboard({
       onLayoutCommit={handleLayoutCommit}
       onItemChange={handleItemChange}
       onColumnsChange={handleColumnsChange}
+      onAddItem={handleAddNote}
       initialColumnCount={
         artifact.columnCount ?? Math.min(3, Math.max(1, artifact.notes.length))
       }
