@@ -213,7 +213,7 @@ export default function ArtifactFromMessagePage() {
         {artifact.kind === "table" && <ArtifactTable artifact={artifact} />}
         {artifact.kind === "slide" && <ArtifactSlides artifact={artifact} />}
         {artifact.kind === "notesboard" && (
-          <ArtifactNotesboard artifact={artifact} />
+          <ArtifactNotesboard data={result} artifact={artifact} />
         )}
         {artifact.kind === "notes" && <ArtifactNotes data={result} artifact={artifact} />}
       </div>

@@ -1,3 +1,5 @@
+import type { Descendant } from "slate";
+
 export type ChatRole =
 	| "user"
 	| "assistant"
@@ -70,16 +72,26 @@ export interface SlideArtifact {
 
 export interface NotesboardNote {
 	title: string;
-	/** Markdown body — converted to Slate when rendered. */
-	content: string;
+	/**
+	 * Markdown body when first created from chat; Slate document once the
+	 * note has been edited on the board.
+	 */
+	content: string | Descendant[];
 	/** Links a note back to the chat message it came from. */
 	sourceMessageId?: string;
+	/** Grid position / size saved after drag or resize. */
+	x?: number;
+	y?: number;
+	w?: number;
+	h?: number;
 }
 
 export interface NotesboardArtifact {
 	kind: "notesboard";
 	title: string;
 	notes: NotesboardNote[];
+	/** Board column count saved from the grid controls. */
+	columnCount?: number;
 }
 
 /** Single note saved from a chat message (markdown body). */

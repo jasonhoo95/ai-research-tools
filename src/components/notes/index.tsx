@@ -54,6 +54,13 @@ type MasonryGridProps = {
     onReorder?: (items: MasonryItem[]) => void
     onLayoutChange?: (layout: Layout, items: MasonryItem[]) => void
     onColumnsChange?: (columnCount: number) => void
+    /** Fired after a drag/resize finishes or a column is removed. */
+    onLayoutCommit?: (items: MasonryItem[]) => void
+    /** Fired when a card's title or body is edited. */
+    onItemChange?: (
+        id: string,
+        patch: Pick<MasonryItem, "label" | "body">,
+    ) => void
     initialColumnCount?: number
     rowHeight?: number
     className?: string
@@ -369,8 +376,10 @@ function clampLayoutToColumns(
  */
 function PinCard({
     item,
+    onItemChange,
 }: {
     item: MasonryItem
+    onItemChange?: MasonryGridProps["onItemChange"]
 }) {
     const [label, setLabel] =
         useState(item.label ?? "")
@@ -393,8 +402,11 @@ function PinCard({
         useCallback(
             (value: Descendant[]) => {
                 setBody(cloneBody(value))
+                onItemChange?.(item.id, {
+                    body: cloneBody(value),
+                })
             },
-            [],
+            [item.id, onItemChange],
         )
 
     useEffect(() => {
@@ -414,10 +426,17 @@ function PinCard({
     const handleBlur = (
         event: React.FocusEvent<HTMLSpanElement>,
     ) => {
+        const nextLabel =
+            event.currentTarget.innerText
+
         setIsEditing(false)
-        setLabel(
-            event.currentTarget.innerText,
-        )
+        setLabel(nextLabel)
+
+        if (nextLabel !== label) {
+            onItemChange?.(item.id, {
+                label: nextLabel,
+            })
+        }
     }
 
     return (
@@ -528,6 +547,8 @@ export function NotesGrid({
     onReorder,
     onLayoutChange,
     onColumnsChange,
+    onLayoutCommit,
+    onItemChange,
     initialColumnCount = 4,
     rowHeight = ROW_HEIGHT,
     className,
@@ -614,6 +635,20 @@ export function NotesGrid({
     }
 
     /**
+     * Drag / resize finished — the final layout is ready to persist.
+     */
+    function handleInteractionStop(
+        nextLayout: Layout,
+    ) {
+        onLayoutCommit?.(
+            mergeItemsWithLayout(
+                items,
+                nextLayout,
+            ),
+        )
+    }
+
+    /**
      * Add a column.
      */
     function addColumn() {
@@ -656,6 +691,13 @@ export function NotesGrid({
 
         publishLayout(
             nextLayout,
+        )
+
+        onLayoutCommit?.(
+            mergeItemsWithLayout(
+                items,
+                nextLayout,
+            ),
         )
     }
 
@@ -793,6 +835,12 @@ export function NotesGrid({
                         onLayoutChange={
                             handleLayoutChange
                         }
+                        onDragStop={
+                            handleInteractionStop
+                        }
+                        onResizeStop={
+                            handleInteractionStop
+                        }
                     >
                         {layout.map(
                             (entry) => {
@@ -817,6 +865,9 @@ export function NotesGrid({
                                         <PinCard
                                             item={
                                                 item
+                                            }
+                                            onItemChange={
+                                                onItemChange
                                             }
                                         />
                                     </div>
