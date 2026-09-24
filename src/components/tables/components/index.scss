@@ -1,0 +1,89 @@
+.crm-table-shell {
+  min-height: calc(100vh - 3.5rem);
+  background: #fcfcfd;
+  padding: 1.5rem 1.5rem 2rem;
+}
+
+.crm-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.crm-table-header .crm-table-head {
+  height: 3rem;
+  border-bottom: 1px solid #f1f1f4;
+  padding: 0 1rem;
+  font-weight: 600;
+}
+
+.crm-table-header .crm-checkbox-col,
+.crm-table-body .crm-checkbox-col {
+  width: 52px;
+  padding-left: 1.25rem;
+  padding-right: 0.5rem;
+}
+
+.crm-table-header .crm-actions-col,
+.crm-table-body .crm-actions-col {
+  width: 52px;
+  padding-right: 1rem;
+}
+
+.crm-table-row {
+  transition: background-color 0.15s ease;
+}
+
+.crm-table-row:hover,
+.crm-table-row-selected {
+  background: #fafafa;
+}
+
+.crm-table-cell {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  vertical-align: middle;
+}
+
+.table-row-sort {
+  .grip-sort {
+    opacity: 0;
+    cursor: grab;
+    color: rgb(156 163 175);
+    transition: opacity 0.3s ease, color 0.2s ease;
+  }
+
+  &:hover {
+    .grip-sort {
+      opacity: 1;
+      cursor: grab;
+      color: rgb(75 85 99);
+    }
+  }
+}
+
+.red-tag {
+  &:hover {
+    background-color: rgba(255, 100, 100, 0.6);
+  }
+
+  td {
+    .cursor-text {
+      color: black !important;
+      font-weight: 600 !important;
+    }
+  }
+
+  td:first-child {
+    position: relative;
+  }
+
+  td:first-child::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 4px;
+    height: 100%;
+    background-color: #ff6464;
+  }
+}
