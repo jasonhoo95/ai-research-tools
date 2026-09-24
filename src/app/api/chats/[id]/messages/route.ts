@@ -9,6 +9,7 @@ export async function GET(
   const { id } = await ctx.params
   try {
     const upstream = await api.get(`/chats/${id}/messages`, {
+      params: Object.fromEntries(request.nextUrl.searchParams),
       headers: headersFromIncoming(request.headers),
       validateStatus: proxyValidateStatus,
     })

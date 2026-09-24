@@ -27,6 +27,8 @@ export interface ChatBubbleMessage {
   }
   sources?: CitationSource[]
   searchProvider?: SearchProvider
+  /** ISO timestamp — drives the day separators in the message list. */
+  createdAt?: string
 }
 
 export interface ArtifactSaveState {

@@ -49,6 +49,29 @@ export interface MessageRow {
 	updated_at: string;
 }
 
+/** One page of messages, oldest → newest. Cursors are opaque. */
+export interface MessagePage {
+	items: MessageRow[];
+	hasMoreBefore: boolean;
+	hasMoreAfter: boolean;
+	beforeCursor: string | null;
+	afterCursor: string | null;
+}
+
+export interface MessageSearchHit {
+	id: string;
+	role: "user" | "assistant";
+	snippet: string;
+	created_at: string;
+}
+
+/** Search hits, newest first. */
+export interface MessageSearchPage {
+	items: MessageSearchHit[];
+	hasMore: boolean;
+	nextCursor: string | null;
+}
+
 /**
  * A per-chatbot pinned artifact row. `content` carries the full
  * GeneratedArtifact JSON that was saved from a message bubble.
@@ -104,12 +127,34 @@ export const chatRepo = {
 		await appApi.delete(`/chats/${id}`);
 	},
 
+	/**
+	 * Paginated messages. No cursor → newest page; `before` → older;
+	 * `after` → newer; `around` → page centred on a message id.
+	 */
 	async listMessages(
 		chatId: string,
-	): Promise<MessageRow[]> {
-		const { data } = await appApi.get<
-			MessageRow[]
-		>(`/chats/${chatId}/messages`);
+		params: {
+			limit?: number;
+			before?: string;
+			after?: string;
+			around?: string;
+		} = {},
+	): Promise<MessagePage> {
+		const { data } = await appApi.get<MessagePage>(
+			`/chats/${chatId}/messages`,
+			{ params },
+		);
+		return data;
+	},
+
+	async searchMessages(
+		chatId: string,
+		params: { q: string; limit?: number; cursor?: string },
+	): Promise<MessageSearchPage> {
+		const { data } = await appApi.get<MessageSearchPage>(
+			`/chats/${chatId}/messages/search`,
+			{ params },
+		);
 		return data;
 	},
 

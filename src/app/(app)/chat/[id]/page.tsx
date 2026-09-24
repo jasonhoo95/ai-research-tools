@@ -7,11 +7,13 @@ import { useEffect, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { ApiError } from "@/lib/api"
 import { chatClient } from "@/lib/chat-client"
+import { ArrowDown, Loader2 } from "lucide-react"
 import {
   chatRepo,
   type ArtifactChatRow,
   type ChatRow,
   type MessageContent,
+  type MessagePage,
 } from "@/lib/chat-repo"
 import type { ChatHistoryItem, GeneratedArtifact } from "@/lib/chat-types"
 import { artifactsStore } from "@/lib/artifacts-store"
@@ -27,6 +29,8 @@ import {
   type ChatBubbleMessage,
 } from "@/components/chat/message-bubble"
 import { Composer } from "@/components/chat/composer"
+import { DateSeparator, dayKey } from "@/components/chat/date-separator"
+import { MessageSearch } from "@/components/chat/message-search"
 import {
   ArtifactsPanel,
   type ChatArtifactItem,
@@ -35,6 +39,7 @@ import { AppDialog } from "@/components/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
@@ -50,9 +55,11 @@ type AddNoteValues = z.infer<typeof addNoteSchema>
 function contentToBubble(row: {
   id: string
   content: MessageContent
+  created_at: string
 }): ChatBubbleMessage {
   return {
     id: row.id,
+    createdAt: row.created_at,
     role: row.content.role,
     content: row.content.text,
     attachment: row.content.attachment,
@@ -61,6 +68,11 @@ function contentToBubble(row: {
     searchProvider: row.content.searchProvider,
   }
 }
+
+const PAGE_SIZE = 30
+/** Distance (px) from an edge at which the next page starts loading. */
+const LOAD_MARGIN_PX = 300
+const HIGHLIGHT_MS = 2000
 
 const MAX_HISTORY_MESSAGES = 5
 function toHistory(messages: ChatBubbleMessage[]): ChatHistoryItem[] {
@@ -98,6 +110,29 @@ export default function ChatConversationPage() {
   >(() => new Set())
 
   const scrollRef = React.useRef<HTMLDivElement>(null)
+  const topSentinelRef = React.useRef<HTMLDivElement>(null)
+  const bottomSentinelRef = React.useRef<HTMLDivElement>(null)
+
+  // Pagination window. When the user jumps to a search hit the window can
+  // sit in the middle of the history, so both directions may have more.
+  const [hasMoreBefore, setHasMoreBefore] = React.useState(false)
+  const [hasMoreAfter, setHasMoreAfter] = React.useState(false)
+  const beforeCursorRef = React.useRef<string | null>(null)
+  const afterCursorRef = React.useRef<string | null>(null)
+  const [loadingOlder, setLoadingOlder] = React.useState(false)
+  const [loadingNewer, setLoadingNewer] = React.useState(false)
+  // Bumped whenever the window is replaced so stale page loads are dropped.
+  const windowGenRef = React.useRef(0)
+  // Scroll height captured before prepending older messages, so the view
+  // can be re-anchored instead of jumping.
+  const prependAnchorRef = React.useRef<{ height: number; top: number } | null>(
+    null,
+  )
+  const [scrollTarget, setScrollTarget] = React.useState<
+    { kind: "bottom"; smooth: boolean } | { kind: "message"; id: string } | null
+  >(null)
+  const [highlightId, setHighlightId] = React.useState<string | null>(null)
+  const [showJumpToLatest, setShowJumpToLatest] = React.useState(false)
 
   const savedArtifactIds = React.useMemo(
     () =>
@@ -140,10 +175,113 @@ export default function ChatConversationPage() {
   )
 
 
+  /** Replace the whole message window with `page`. */
+  const applyWindow = React.useCallback((page: MessagePage) => {
+    windowGenRef.current++
+    prependAnchorRef.current = null
+    const bubbles = page.items.map(contentToBubble)
+    setMessages(bubbles)
+    setHasMoreBefore(page.hasMoreBefore)
+    setHasMoreAfter(page.hasMoreAfter)
+    beforeCursorRef.current = page.beforeCursor
+    afterCursorRef.current = page.afterCursor
+    return bubbles
+  }, [])
+
+  const loadLatest = React.useCallback(async () => {
+    const page = await chatRepo.listMessages(chatId, { limit: PAGE_SIZE })
+    return applyWindow(page)
+  }, [chatId, applyWindow])
+
+  const loadOlder = React.useCallback(async () => {
+    const cursor = beforeCursorRef.current
+    if (!chatId || !cursor || loadingOlder) return
+    const gen = windowGenRef.current
+    setLoadingOlder(true)
+    try {
+      const page = await chatRepo.listMessages(chatId, {
+        limit: PAGE_SIZE,
+        before: cursor,
+      })
+      if (gen !== windowGenRef.current) return
+      const el = scrollRef.current
+      if (el) {
+        prependAnchorRef.current = { height: el.scrollHeight, top: el.scrollTop }
+      }
+      setMessages((prev) => [...page.items.map(contentToBubble), ...prev])
+      setHasMoreBefore(page.hasMoreBefore)
+      if (page.beforeCursor) beforeCursorRef.current = page.beforeCursor
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [chatId, loadingOlder])
+
+  const loadNewer = React.useCallback(async () => {
+    const cursor = afterCursorRef.current
+    if (!chatId || !cursor || loadingNewer) return
+    const gen = windowGenRef.current
+    setLoadingNewer(true)
+    try {
+      const page = await chatRepo.listMessages(chatId, {
+        limit: PAGE_SIZE,
+        after: cursor,
+      })
+      if (gen !== windowGenRef.current) return
+      setMessages((prev) => {
+        const seen = new Set(prev.map((m) => m.id))
+        return [
+          ...prev,
+          ...page.items.map(contentToBubble).filter((m) => !seen.has(m.id)),
+        ]
+      })
+      setHasMoreAfter(page.hasMoreAfter)
+      if (page.afterCursor) afterCursorRef.current = page.afterCursor
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoadingNewer(false)
+    }
+  }, [chatId, loadingNewer])
+
+  /** Load (if needed) and scroll to a message, e.g. from a search hit. */
+  const jumpToMessage = React.useCallback(
+    async (messageId: string) => {
+      if (!chatId) return
+      if (!messages.some((m) => m.id === messageId)) {
+        try {
+          const page = await chatRepo.listMessages(chatId, {
+            limit: PAGE_SIZE,
+            around: messageId,
+          })
+          applyWindow(page)
+        } catch (err) {
+          setError((err as Error).message)
+          return
+        }
+      }
+      setScrollTarget({ kind: "message", id: messageId })
+    },
+    [chatId, messages, applyWindow],
+  )
+
+  const jumpToLatest = async () => {
+    if (hasMoreAfter) {
+      try {
+        await loadLatest()
+      } catch (err) {
+        setError((err as Error).message)
+        return
+      }
+    }
+    setScrollTarget({ kind: "bottom", smooth: !hasMoreAfter })
+  }
+
   async function fetchAll() {
-    const [c, rows, artifacts] = await Promise.all([
+    const [c, page, artifacts] = await Promise.all([
       chatRepo.getChat(chatId),
-      chatRepo.listMessages(chatId),
+      chatRepo.listMessages(chatId, { limit: PAGE_SIZE }),
       chatRepo.listArtifacts(chatId).catch(() => []),
     ])
     if (!c) {
@@ -151,7 +289,8 @@ export default function ChatConversationPage() {
       return
     }
     setChat(c)
-    setMessages(rows.map(contentToBubble))
+    applyWindow(page)
+    setScrollTarget({ kind: "bottom", smooth: false })
 
     setPinnedArtifacts(artifacts)
     // Warm the local artifact cache so /artifacts/[id] can open them
@@ -174,12 +313,81 @@ export default function ChatConversationPage() {
   })
 
 
+  // Keep the viewport anchored when older messages are prepended.
+  React.useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current
+    const el = scrollRef.current
+    if (!anchor || !el) return
+    prependAnchorRef.current = null
+    el.scrollTop = anchor.top + (el.scrollHeight - anchor.height)
+  }, [messages])
+
+  // Run a requested scroll once the messages it depends on have rendered.
+  React.useLayoutEffect(() => {
+    if (!scrollTarget) return
+    const el = scrollRef.current
+    if (!el) return
+    if (scrollTarget.kind === "bottom") {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: scrollTarget.smooth ? "smooth" : "auto",
+      })
+    } else {
+      const node = el.querySelector<HTMLElement>(
+        `[data-message-id="${CSS.escape(scrollTarget.id)}"]`,
+      )
+      if (!node) return
+      // Tall answers read from their start; short ones sit mid-screen.
+      node.scrollIntoView({
+        block: node.offsetHeight > el.clientHeight * 0.8 ? "start" : "center",
+      })
+      setHighlightId(scrollTarget.id)
+    }
+    setScrollTarget(null)
+  }, [scrollTarget, messages, pending, loading])
+
   React.useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    })
-  }, [messages.length, pending])
+    if (!highlightId) return
+    const t = setTimeout(() => setHighlightId(null), HIGHLIGHT_MS)
+    return () => clearTimeout(t)
+  }, [highlightId])
+
+  // Infinite scroll: load older at the top, newer at the bottom (the latter
+  // only after jumping into the middle of the history).
+  React.useEffect(() => {
+    const root = scrollRef.current
+    if (!root) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          if (entry.target === topSentinelRef.current && hasMoreBefore) {
+            void loadOlder()
+          }
+          if (entry.target === bottomSentinelRef.current && hasMoreAfter) {
+            void loadNewer()
+          }
+        }
+      },
+      { root, rootMargin: `${LOAD_MARGIN_PX}px 0px` },
+    )
+    if (topSentinelRef.current) observer.observe(topSentinelRef.current)
+    if (bottomSentinelRef.current) observer.observe(bottomSentinelRef.current)
+    return () => observer.disconnect()
+    // Re-observing after each page makes the observer fire again if the
+    // sentinel is still visible (e.g. a short first page).
+  }, [hasMoreBefore, hasMoreAfter, loadOlder, loadNewer, messages, loading])
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const fromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    setShowJumpToLatest(hasMoreAfter || fromBottom > 400)
+  }
+
+  React.useEffect(() => {
+    if (hasMoreAfter) setShowJumpToLatest(true)
+  }, [hasMoreAfter])
 
   const send = async (text: string, file: File | null) => {
     if (!chatId) return
@@ -187,6 +395,18 @@ export default function ChatConversationPage() {
     if ((!value && !file) || pending) return
 
     setError(null)
+
+    // If the user scrolled back via search, snap to the latest messages so
+    // the new message lands after them and history is the real tail.
+    let base = messages
+    if (hasMoreAfter) {
+      try {
+        base = await loadLatest()
+      } catch (err) {
+        setError((err as Error).message)
+        return
+      }
+    }
 
     const userContent: MessageContent = {
       role: "user",
@@ -200,18 +420,24 @@ export default function ChatConversationPage() {
       role: "user",
       content: userContent.text,
       attachment: userContent.attachment,
+      createdAt: new Date().toISOString(),
     }
     setMessages((prev) => [...prev, optimisticUser])
     setPending(true)
+    setScrollTarget({ kind: "bottom", smooth: true })
 
     try {
       const savedUser = await chatRepo.appendMessage(chatId, userContent)
       userMsgId = savedUser.id
       setMessages((prev) =>
-        prev.map((m) => (m.id === optimisticUser.id ? { ...m, id: savedUser.id } : m)),
+        prev.map((m) =>
+          m.id === optimisticUser.id
+            ? { ...m, id: savedUser.id, createdAt: savedUser.created_at }
+            : m,
+        ),
       )
 
-      const history = toHistory(messages)
+      const history = toHistory(base)
       const questionForGemini =
         value ||
         (file ? "Please summarize this file and highlight its key points." : "")
@@ -242,6 +468,7 @@ export default function ChatConversationPage() {
         ...prev,
         {
           id: savedAssistant.id,
+          createdAt: savedAssistant.created_at,
           role: "assistant",
           artifact: assistantContent.artifact,
           content: assistantContent.text,
@@ -249,6 +476,8 @@ export default function ChatConversationPage() {
           searchProvider: assistantContent.searchProvider,
         },
       ])
+      setScrollTarget({ kind: "bottom", smooth: true })
+      afterCursorRef.current = null
     } catch (err) {
       const msg =
         err instanceof ApiError
@@ -393,9 +622,25 @@ export default function ChatConversationPage() {
         className="mx-auto chat-container flex max-h-[calc(100vh-10px)] w-full max-w-full flex-1 flex-col transition-[padding] duration-300"
         style={{ paddingRight: artifactsOpen ? 360 : 0 }}
       >
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+        {chatId && (
+          <div className="absolute right-4 top-3 z-20">
+            <MessageSearch chatId={chatId} onSelect={jumpToMessage} />
+          </div>
+        )}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto [overflow-anchor:none]"
+        >
           <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-8">
-            {chat?.description && (
+            <div ref={topSentinelRef} aria-hidden className="h-px" />
+            {loadingOlder && (
+              <div className="flex justify-center text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+              </div>
+            )}
+            {!hasMoreBefore && chat?.description && (
               <p className="text-sm text-[#71717a]">{chat.description}</p>
             )}
             {messages.length === 0 && !pending && (
@@ -403,7 +648,11 @@ export default function ChatConversationPage() {
                 Send your first message to get things started.
               </div>
             )}
-            {messages.map((m) => {
+            {messages.map((m, i) => {
+              const prevCreated = messages[i - 1]?.createdAt
+              const showDate =
+                m.createdAt &&
+                (!prevCreated || dayKey(prevCreated) !== dayKey(m.createdAt))
               const artifactId = m.artifact?.id
               const saveState = artifactId
                 ? {
@@ -413,8 +662,16 @@ export default function ChatConversationPage() {
                 }
                 : undefined
               return (
+                <React.Fragment key={m.id}>
+                {showDate && <DateSeparator iso={m.createdAt!} />}
+                <div
+                  data-message-id={m.id}
+                  className={cn(
+                    "-mx-3 rounded-2xl px-3 py-1 transition-colors duration-700",
+                    highlightId === m.id && "bg-yellow-100/70 dark:bg-yellow-500/15",
+                  )}
+                >
                 <MessageBubble
-                  key={m.id}
                   message={m}
                   artifactSaveState={saveState}
                   noteState={{
@@ -424,8 +681,16 @@ export default function ChatConversationPage() {
                   }}
                   chatbotId={chatId}
                 />
+                </div>
+                </React.Fragment>
               )
             })}
+            {loadingNewer && (
+              <div className="flex justify-center text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+              </div>
+            )}
+            <div ref={bottomSentinelRef} aria-hidden className="h-px" />
             {pending && (
               <MessageBubble
                 message={{ id: "typing", role: "assistant", content: "" }}
@@ -438,6 +703,17 @@ export default function ChatConversationPage() {
               </div>
             )}
           </div>
+        </div>
+        {showJumpToLatest && (
+          <button
+            type="button"
+            onClick={jumpToLatest}
+            aria-label="Jump to latest messages"
+            className="absolute bottom-3 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-md hover:bg-muted hover:text-foreground"
+          >
+            <ArrowDown className="size-4" />
+          </button>
+        )}
         </div>
 
         <div className="bg-gradient-to-t from-background via-background to-background/80 px-4 pt-2 pb-5">
