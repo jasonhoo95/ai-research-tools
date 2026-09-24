@@ -31,7 +31,8 @@ export type ArtifactKind =
 	| "table"
 	| "slide"
 	| "notesboard"
-	| "notes";
+	| "notes"
+	| "bio";
 
 export interface ChartDataPoint {
 	label: string;
@@ -108,12 +109,45 @@ export interface NotesArtifact {
 	sourceMessageId?: string;
 }
 
+export type BioSectionType =
+	| "about"
+	| "experience"
+	| "education"
+	| "skills"
+	| "projects"
+	| "awards"
+	| "other";
+
+export interface BioSection {
+	id: string;
+	type: BioSectionType;
+	title: string;
+	/** Markdown when generated; Slate document once edited. */
+	content: string | Descendant[];
+}
+
+/** LinkedIn-style profile page. */
+export interface BioArtifact {
+	kind: "bio";
+	title: string;
+	name: string;
+	headline: string;
+	location?: string;
+	highlights: string[];
+	bannerUrl?: string;
+	avatarUrl?: string;
+	/** Fallback banner gradient when there is no banner image. */
+	palette: { from: string; to: string };
+	sections: BioSection[];
+}
+
 export type Artifact =
 	| ChartArtifact
 	| TableArtifact
 	| SlideArtifact
 	| NotesboardArtifact
-	| NotesArtifact;
+	| NotesArtifact
+	| BioArtifact;
 
 export interface GeneratedArtifact {
 	id: string;

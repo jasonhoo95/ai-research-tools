@@ -12,6 +12,8 @@ export function artifactKindLabel(kind: ArtifactKind): string {
       return "Notes board"
     case "notes":
       return "Note"
+    case "bio":
+      return "Profile"
   }
 }
 
@@ -27,5 +29,7 @@ export function artifactKindIcon(kind: ArtifactKind): string {
       return "📝"
     case "notes":
       return "📌"
+    case "bio":
+      return "👤"
   }
 }

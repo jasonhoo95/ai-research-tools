@@ -17,6 +17,7 @@ import { ArtifactTable } from "@/components/artifact/artifact-table"
 import { ArtifactSlides } from "@/components/artifact/artifact-slides"
 import { ArtifactNotes } from "@/components/artifact/artifact-notes"
 import { ArtifactNotesboard } from "@/components/artifact/artifact-notesboard"
+import { ArtifactBio } from "@/components/artifact/artifact-bio"
 
 const KNOWN_KINDS: ReadonlyArray<Artifact["kind"]> = [
   "chart",
@@ -24,6 +25,7 @@ const KNOWN_KINDS: ReadonlyArray<Artifact["kind"]> = [
   "slide",
   "notesboard",
   "notes",
+  "bio",
 ]
 
 function artifactFromResult(data: MessageArtifactResult): Artifact | null {
@@ -48,6 +50,8 @@ function isRenderableArtifact(value: unknown): value is Artifact {
       return Array.isArray(a.notes)
     case "notes":
       return typeof a.content === "string" || Array.isArray(a.content)
+    case "bio":
+      return Array.isArray(a.sections)
     default:
       return false
   }
@@ -194,7 +198,8 @@ export default function ArtifactFromMessagePage() {
   const isWideLayout =
     artifact.kind === "notesboard" ||
     artifact.kind === "notes" ||
-    artifact.kind === "slide"
+    artifact.kind === "slide" ||
+    artifact.kind === "bio"
   const saveStatusLabel =
     artifact.kind === "notes"
       ? saveStatus === "pending" || saveStatus === "saving"
@@ -262,6 +267,7 @@ export default function ArtifactFromMessagePage() {
           <ArtifactNotesboard data={view} artifact={artifact} />
         )}
         {artifact.kind === "notes" && <ArtifactNotes data={view} artifact={artifact} />}
+        {artifact.kind === "bio" && <ArtifactBio data={view} artifact={artifact} />}
       </div>
 
       {artifact.kind === "chart" && (
