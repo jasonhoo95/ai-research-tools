@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Bookmark, BookmarkCheck, StickyNote } from "lucide-react"
+import { Bookmark, BookmarkCheck, Pin, StickyNote } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Markdown } from "@/components/markdown"
 import { cn } from "@/lib/utils"
@@ -29,6 +29,8 @@ export interface ChatBubbleMessage {
   searchProvider?: SearchProvider
   /** ISO timestamp — drives the day separators in the message list. */
   createdAt?: string
+  /** Pinned to the chat's side panel. */
+  pinned?: boolean
 }
 
 export interface ArtifactSaveState {
@@ -37,6 +39,12 @@ export interface ArtifactSaveState {
   onSave: () => void
   /** Unsave: deletes the saved row from this chat's artifacts. */
   onRemove: () => void
+}
+
+export interface MessagePinState {
+  pinned: boolean
+  pending: boolean
+  onToggle: () => void
 }
 
 export interface MessageNoteState {
@@ -52,6 +60,7 @@ export function MessageBubble({
   typing,
   artifactSaveState,
   noteState,
+  pinState,
   chatbotId,
 }: {
   message: ChatBubbleMessage
@@ -60,6 +69,8 @@ export function MessageBubble({
   artifactSaveState?: ArtifactSaveState
   /** When present, renders an add-to-notes button on the bubble. */
   noteState?: MessageNoteState
+  /** When present, assistant bubbles get a hover pin button (top right). */
+  pinState?: MessagePinState
   /** Parent chatbot id, used to build the artifact detail URL. */
   chatbotId?: string
 }) {
@@ -68,7 +79,7 @@ export function MessageBubble({
     noteState && !typing && message.content.trim().length > 0
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("group/message flex gap-3", isUser && "flex-row-reverse")}>
       <Avatar className="h-8 w-8 shrink-0">
         <AvatarFallback
           className={cn(isUser ? "bg-primary text-primary-foreground" : "bg-muted")}
@@ -84,6 +95,26 @@ export function MessageBubble({
             : "bg-muted text-foreground",
         )}
       >
+        {pinState && !isUser && !typing ? (
+          <button
+            type="button"
+            onClick={pinState.onToggle}
+            disabled={pinState.pending}
+            aria-pressed={pinState.pinned}
+            aria-label={pinState.pinned ? "Unpin message" : "Pin message"}
+            title={pinState.pinned ? "Unpin" : "Pin"}
+            className={cn(
+              // Just outside the bubble's top-right corner, like ChatGPT's
+              // hover actions; stays visible once pinned.
+              "absolute -right-9 top-0 flex size-7 items-center justify-center rounded-lg transition-[opacity,color,background-color] hover:bg-muted focus-visible:opacity-100 disabled:opacity-50",
+              pinState.pinned
+                ? "text-[#f97316] opacity-100"
+                : "text-muted-foreground opacity-0 hover:text-foreground group-hover/message:opacity-100",
+            )}
+          >
+            <Pin className={cn("size-3.5 transition-transform", pinState.pinned && "rotate-45 fill-current")} />
+          </button>
+        ) : null}
         {typing ? (
           <TypingDots />
         ) : (

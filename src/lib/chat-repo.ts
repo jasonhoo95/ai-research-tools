@@ -45,6 +45,8 @@ export interface MessageRow {
 	id: string;
 	parent_chatbot_id: string;
 	content: MessageContent;
+	/** Pinned by the user; null on rows from before the column existed. */
+	pin_message?: boolean | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -154,6 +156,27 @@ export const chatRepo = {
 		const { data } = await appApi.get<MessageSearchPage>(
 			`/chats/${chatId}/messages/search`,
 			{ params },
+		);
+		return data;
+	},
+
+	/** Pinned messages in this chat, newest first. */
+	async listPinnedMessages(chatId: string): Promise<MessageRow[]> {
+		const { data } = await appApi.get<MessageRow[]>(
+			`/chats/${chatId}/messages/pinned`,
+		);
+		return data;
+	},
+
+	/** Pin or unpin a message; returns the updated row. */
+	async pinMessage(
+		chatId: string,
+		messageId: string,
+		pinned: boolean,
+	): Promise<MessageRow> {
+		const { data } = await appApi.patch<MessageRow>(
+			`/chats/${chatId}/messages/${messageId}/pin`,
+			{ pinned },
 		);
 		return data;
 	},

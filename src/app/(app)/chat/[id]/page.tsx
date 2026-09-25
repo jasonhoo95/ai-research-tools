@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { ApiError } from "@/lib/api"
 import { chatClient } from "@/lib/chat-client"
-import { ArrowDown, Loader2 } from "lucide-react"
+import { ArrowDown, Loader2, Pin } from "lucide-react"
 import {
   chatRepo,
   type ArtifactChatRow,
@@ -38,7 +38,10 @@ import {
 import {
   ArtifactsPanel,
   type ChatArtifactItem,
+  type ChatPanelTab,
+  type PinnedMessageItem,
 } from "@/components/chat/artifacts-panel"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { AppDialog } from "@/components/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -60,10 +63,12 @@ function contentToBubble(row: {
   id: string
   content: MessageContent
   created_at: string
+  pin_message?: boolean | null
 }): ChatBubbleMessage {
   return {
     id: row.id,
     createdAt: row.created_at,
+    pinned: Boolean(row.pin_message),
     role: row.content.role,
     content: row.content.text,
     attachment: row.content.attachment,
@@ -100,6 +105,9 @@ export default function ChatConversationPage() {
   const [loading, setLoading] = React.useState(true)
   const [notFound, setNotFound] = React.useState(false)
   const [artifactsOpen, setArtifactsOpen] = React.useState(false)
+  const [panelTab, setPanelTab] = React.useState<ChatPanelTab>("artifacts")
+  const [pinnedMessages, setPinnedMessages] = React.useState<PinnedMessageItem[]>([])
+  const [pinningIds, setPinningIds] = React.useState<Set<string>>(() => new Set())
   const [pinnedArtifacts, setPinnedArtifacts] = React.useState<ArtifactChatRow[]>(
     [],
   )
@@ -285,10 +293,11 @@ export default function ChatConversationPage() {
   }
 
   async function fetchAll() {
-    const [c, page, artifacts] = await Promise.all([
+    const [c, page, artifacts, pinned] = await Promise.all([
       chatRepo.getChat(chatId),
       chatRepo.listMessages(chatId, { limit: PAGE_SIZE }),
       chatRepo.listArtifacts(chatId).catch(() => []),
+      chatRepo.listPinnedMessages(chatId).catch(() => []),
     ])
     if (!c) {
       setNotFound(true)
@@ -296,6 +305,13 @@ export default function ChatConversationPage() {
     }
     setChat(c)
     applyWindow(page)
+    setPinnedMessages(
+      pinned.map((row) => ({
+        id: row.id,
+        text: row.content.text,
+        createdAt: row.created_at,
+      })),
+    )
     setScrollTarget({ kind: "bottom", smooth: false })
 
     setPinnedArtifacts(artifacts)
@@ -497,6 +513,47 @@ export default function ChatConversationPage() {
     }
   }
 
+  /** Reflect a pin change in both the message list and the Pinned tab. */
+  const applyPinned = (item: PinnedMessageItem, pinned: boolean) => {
+    setMessages((prev) => prev.map((m) => (m.id === item.id ? { ...m, pinned } : m)))
+    setPinnedMessages((prev) => {
+      const rest = prev.filter((p) => p.id !== item.id)
+      if (!pinned) return rest
+      // Newest first, like the backend list.
+      return [...rest, item].sort((a, b) =>
+        (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
+      )
+    })
+  }
+
+  /** Pin or unpin optimistically; roll back if the request fails. */
+  const handleTogglePin = async (item: PinnedMessageItem, pinned: boolean) => {
+    if (!chatId || pinningIds.has(item.id)) return
+    setPinningIds((prev) => new Set(prev).add(item.id))
+    applyPinned(item, pinned)
+    try {
+      await chatRepo.pinMessage(chatId, item.id, pinned)
+    } catch (err) {
+      applyPinned(item, !pinned)
+      setError((err as Error).message)
+    } finally {
+      setPinningIds((prev) => {
+        const next = new Set(prev)
+        next.delete(item.id)
+        return next
+      })
+    }
+  }
+
+  const togglePinnedPanel = () => {
+    if (artifactsOpen && panelTab === "pinned") {
+      setArtifactsOpen(false)
+      return
+    }
+    setPanelTab("pinned")
+    setArtifactsOpen(true)
+  }
+
   /** Delete saved rows (all duplicates) for one bubble button. */
   const handleUnsave = async (
     rowIds: string[],
@@ -533,6 +590,7 @@ export default function ChatConversationPage() {
       artifactsStore.save(generated)
       const row = await chatRepo.saveArtifact(chatId, generated)
       setPinnedArtifacts((prev) => [row, ...prev])
+      setPanelTab("artifacts")
       setArtifactsOpen(true)
     } catch (err) {
       // Shown inside the dialog, which stays open for another try.
@@ -679,6 +737,29 @@ export default function ChatConversationPage() {
         {chatId && (
           <div className="absolute right-4 top-3 z-20 flex items-center gap-2">
             <CreateArtifactMenu onCreate={handleCreateArtifact} />
+            <Tooltip>
+              <TooltipTrigger
+                onClick={togglePinnedPanel}
+                aria-label={`Pinned messages (${pinnedMessages.length})`}
+                aria-pressed={artifactsOpen && panelTab === "pinned"}
+                className={cn(
+                  "relative flex size-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground",
+                  artifactsOpen && panelTab === "pinned" && "bg-muted text-foreground",
+                )}
+              >
+                <Pin className="size-4" />
+                {pinnedMessages.length > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+                    {pinnedMessages.length > 99 ? "99+" : pinnedMessages.length}
+                  </span>
+                ) : null}
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="z-50">
+                {pinnedMessages.length === 0
+                  ? "No pinned messages"
+                  : `${pinnedMessages.length} pinned message${pinnedMessages.length === 1 ? "" : "s"}`}
+              </TooltipContent>
+            </Tooltip>
             <MessageSearch chatId={chatId} onSelect={jumpToMessage} />
           </div>
         )}
@@ -747,6 +828,15 @@ export default function ChatConversationPage() {
                     onRemove: () =>
                       handleUnsave(noteRows ?? [], m.id, setAddingNoteMessageIds),
                   }}
+                  pinState={{
+                    pinned: Boolean(m.pinned),
+                    pending: pinningIds.has(m.id),
+                    onToggle: () =>
+                      handleTogglePin(
+                        { id: m.id, text: m.content, createdAt: m.createdAt },
+                        !m.pinned,
+                      ),
+                  }}
                   chatbotId={chatId}
                 />
                 </div>
@@ -792,10 +882,19 @@ export default function ChatConversationPage() {
       <ArtifactsPanel
         open={artifactsOpen}
         onOpenChange={setArtifactsOpen}
+        tab={panelTab}
+        onTabChange={setPanelTab}
         artifacts={chatArtifacts}
         onDelete={handleDeleteArtifact}
         deleting={deletingRowIds}
         chatbotId={chatId}
+        pinned={pinnedMessages}
+        onSelectPinned={(id) => void jumpToMessage(id)}
+        onUnpin={(id) => {
+          const item = pinnedMessages.find((p) => p.id === id)
+          if (item) void handleTogglePin(item, false)
+        }}
+        unpinning={pinningIds}
       />
     </>
   )
