@@ -619,7 +619,7 @@ export default function ChatConversationPage() {
         </Form>
       </AppDialog>
       <main
-        className="mx-auto chat-container flex max-h-[calc(100vh-10px)] w-full max-w-full flex-1 flex-col transition-[padding] duration-300"
+        className="mx-auto chat-container flex min-h-0 w-full max-w-full flex-1 flex-col transition-[padding] duration-300"
         style={{ paddingRight: artifactsOpen ? 360 : 0 }}
       >
         <div className="relative flex min-h-0 flex-1 flex-col">

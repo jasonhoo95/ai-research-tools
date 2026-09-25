@@ -212,18 +212,20 @@ export default function ArtifactFromMessagePage() {
       : null
 
   return (
+    // Fill the content area: header rows keep their height, the artifact
+    // takes the rest and scrolls inside it.
     <main
-      className={`mx-auto w-full flex-1 px-4 py-10 ${isWideLayout ? "max-w-7xl" : "max-w-5xl"}`}
+      className={`mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pt-6 ${isWideLayout ? "max-w-7xl" : "max-w-5xl"}`}
     >
       <Button
         variant="ghost"
         onClick={() => router.back()}
-        className="text-sm text-muted-foreground hover:text-foreground"
+        className="w-fit shrink-0 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-6 flex shrink-0 flex-wrap items-start justify-between gap-4">
         <div>
           <div className="mb-2 flex items-center gap-2">
             <Badge variant="secondary">{kindLabel}</Badge>
@@ -231,8 +233,8 @@ export default function ArtifactFromMessagePage() {
               Generated{" "}
               {new Date(
                 view.messageCreatedAt ??
-                  (view as { created_at?: string }).created_at ??
-                  "",
+                (view as { created_at?: string }).created_at ??
+                "",
               ).toLocaleString()}
             </span>
           </div>
@@ -250,16 +252,10 @@ export default function ArtifactFromMessagePage() {
         ) : null}
       </div>
       {saveError && saveStatus === "error" ? (
-        <p className="mb-4 text-sm text-red-600">{saveError}</p>
+        <p className="mb-4 shrink-0 text-sm text-red-600">{saveError}</p>
       ) : null}
 
-      <div
-        className={
-          isWideLayout
-            ? "rounded-2xl border bg-card p-2 sm:p-4"
-            : "rounded-2xl border bg-card p-4 sm:p-6"
-        }
-      >
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-10">
         {artifact.kind === "chart" && <ArtifactChart artifact={artifact} />}
         {artifact.kind === "table" && <ArtifactTable artifact={artifact} />}
         {artifact.kind === "slide" && <ArtifactSlides data={view} artifact={artifact} />}

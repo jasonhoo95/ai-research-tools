@@ -466,7 +466,7 @@ export function ArtifactBio({
 
         {/* Sidebar */}
         <aside className="hidden lg:block">
-          <div className="sticky top-20 rounded-xl border bg-card p-4 shadow-xs">
+          <div className="sticky top-0 rounded-xl border bg-card p-4 shadow-xs">
             <h3 className="text-sm font-semibold">On this profile</h3>
             <nav className="mt-3 flex flex-col">
               {bio.sections.map((section) => {
