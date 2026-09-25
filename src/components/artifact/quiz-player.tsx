@@ -35,7 +35,7 @@ function ScoreRing({ percent }: { percent: number }) {
   const circumference = 2 * Math.PI * radius
   const color = percent >= 80 ? "#4c9a2a" : percent >= 50 ? "#d99a1e" : "#e0584a"
   return (
-    <svg viewBox="0 0 128 128" className="size-36" aria-hidden>
+    <svg viewBox="0 0 128 128" className="size-28" aria-hidden>
       <circle cx="64" cy="64" r={radius} fill="none" stroke="#ececec" strokeWidth="10" />
       <circle
         cx="64"
@@ -179,23 +179,25 @@ export function QuizPlayer({
       className="fixed inset-0 z-[150] flex flex-col bg-[#f2f2f2] text-neutral-900 outline-none animate-in fade-in-0 duration-200"
     >
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-[1120px] flex-col px-4 pb-12 pt-6 sm:px-8">
+        <div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 py-6 sm:px-6">
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-sm text-neutral-500 sm:text-base">Study material</p>
-              <h1 className="truncate text-lg font-semibold sm:text-2xl">{title}</h1>
+              <p className="text-xs text-neutral-500 sm:text-sm">Study material</p>
+              <h1 className="truncate text-base font-semibold sm:text-lg">{title}</h1>
             </div>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close quiz"
-              className="flex size-10 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-black/5 hover:text-neutral-900"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-black/5 hover:text-neutral-900"
             >
               <X className="size-5" />
             </button>
           </header>
 
-          <div className="mt-6 flex items-end justify-between text-sm sm:mt-10 sm:text-lg">
+          {/* Progress and card sit centred in the space below the header. */}
+          <div className="flex flex-1 flex-col justify-center py-6">
+          <div className="flex items-end justify-between text-sm">
             <span className="text-neutral-500">
               {phase === "results" ? "Results" : `Question ${step + 1}`}
             </span>
@@ -221,12 +223,12 @@ export function QuizPlayer({
           {phase === "question" && question ? (
             <div
               key={questionIndex}
-              className="mt-8 rounded-[28px] border border-neutral-200 bg-white px-5 py-7 shadow-[0_1px_2px_rgba(0,0,0,0.04)] animate-in fade-in-0 slide-in-from-bottom-2 duration-300 sm:px-12 sm:py-12"
+              className="mt-6 rounded-3xl border border-neutral-200 bg-white px-5 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] animate-in fade-in-0 slide-in-from-bottom-2 duration-300 sm:px-8 sm:py-8"
             >
               <div className="flex items-center justify-between">
                 <span
                   className={cn(
-                    "rounded-xl px-3.5 py-1.5 text-sm font-semibold uppercase tracking-wider sm:text-base",
+                    "rounded-lg px-2.5 py-1 text-xs font-semibold uppercase tracking-wider",
                     DIFFICULTY_STYLES[question.difficulty],
                   )}
                 >
@@ -238,14 +240,14 @@ export function QuizPlayer({
                     onClick={() => setMenuOpen((open) => !open)}
                     aria-label="Quiz options"
                     aria-expanded={menuOpen}
-                    className="flex size-10 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100"
+                    className="flex size-8 items-center justify-center rounded-full text-neutral-600 transition-colors hover:bg-neutral-100"
                   >
-                    <MoreVertical className="size-5" />
+                    <MoreVertical className="size-4" />
                   </button>
                   {menuOpen ? (
                     <div
                       role="menu"
-                      className="absolute right-0 top-11 z-10 w-44 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 text-sm shadow-lg"
+                      className="absolute right-0 top-9 z-10 w-44 overflow-hidden rounded-xl border border-neutral-200 bg-white py-1 text-sm shadow-lg"
                     >
                       <button
                         type="button"
@@ -273,13 +275,13 @@ export function QuizPlayer({
               <h2
                 className={cn(
                   headingFont.className,
-                  "mt-8 text-2xl font-semibold leading-snug sm:text-[34px] sm:leading-[1.45]",
+                  "mt-5 text-xl font-semibold leading-snug sm:text-2xl sm:leading-snug",
                 )}
               >
                 {question.question}
               </h2>
 
-              <div role="radiogroup" aria-label="Answer options" className="mt-8 grid gap-4">
+              <div role="radiogroup" aria-label="Answer options" className="mt-6 grid gap-3">
                 {question.options.map((option, index) => {
                   if (!option.trim()) return null
                   const isCorrect = index === question.answerIndex
@@ -300,7 +302,7 @@ export function QuizPlayer({
                       disabled={answered}
                       onClick={() => choose(index)}
                       className={cn(
-                        "flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-4 text-left text-base leading-relaxed transition-colors sm:gap-6 sm:px-8 sm:py-6 sm:text-[22px]",
+                        "flex w-full items-center gap-3.5 rounded-2xl border-2 px-4 py-3 text-left text-[15px] leading-relaxed transition-colors sm:px-5 sm:py-3.5 sm:text-base",
                         state === "idle" &&
                           "border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50",
                         state === "rest" && "border-neutral-200 bg-white",
@@ -312,7 +314,7 @@ export function QuizPlayer({
                     >
                       <span
                         className={cn(
-                          "flex size-10 shrink-0 items-center justify-center rounded-full text-base font-semibold sm:size-14 sm:text-xl",
+                          "flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold sm:size-9",
                           state === "correct" && "bg-[#4c9a2a] text-white",
                           state === "wrong" && "bg-[#e0584a] text-white",
                           (state === "idle" || state === "rest") &&
@@ -320,9 +322,9 @@ export function QuizPlayer({
                         )}
                       >
                         {state === "correct" ? (
-                          <Check className="size-5 sm:size-7" strokeWidth={2.5} />
+                          <Check className="size-4 sm:size-5" strokeWidth={2.5} />
                         ) : state === "wrong" ? (
-                          <X className="size-5 sm:size-7" strokeWidth={2.5} />
+                          <X className="size-4 sm:size-5" strokeWidth={2.5} />
                         ) : (
                           optionLetter(index)
                         )}
@@ -336,23 +338,23 @@ export function QuizPlayer({
               {answered ? (
                 <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
                   {question.explanation.trim() ? (
-                    <div className="mt-8 rounded-2xl border-2 border-[#cfdcee] bg-[#eef2f7] px-5 py-5 text-base leading-[1.9] sm:px-8 sm:py-6 sm:text-[22px]">
+                    <div className="mt-5 rounded-2xl border-2 border-[#cfdcee] bg-[#eef2f7] px-4 py-3.5 text-[15px] leading-relaxed sm:px-5 sm:text-base">
                       <strong className="font-semibold">Learn:</strong> {question.explanation}
                     </div>
                   ) : null}
-                  <div className="mt-10 flex justify-center">
+                  <div className="mt-6 flex justify-center">
                     <button
                       type="button"
                       onClick={next}
                       autoFocus
-                      className="w-full max-w-sm rounded-full bg-[#6a97c7] px-10 py-3.5 text-lg font-medium text-white shadow-sm transition-colors hover:bg-[#5886b8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6a97c7]/30 sm:text-2xl"
+                      className="w-full max-w-xs rounded-full bg-[#6a97c7] px-8 py-3 text-base font-medium text-white shadow-sm transition-colors hover:bg-[#5886b8] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6a97c7]/30"
                     >
                       {isLast ? "See results" : "Continue"}
                     </button>
                   </div>
                 </div>
               ) : (
-                <p className="mt-8 text-center text-sm text-neutral-400">
+                <p className="mt-6 text-center text-xs text-neutral-400">
                   Press A–{optionLetter(question.options.length - 1)} or click an answer
                 </p>
               )}
@@ -360,10 +362,10 @@ export function QuizPlayer({
           ) : null}
 
           {phase === "results" ? (
-            <div className="mt-8 rounded-[28px] border border-neutral-200 bg-white px-5 py-10 animate-in fade-in-0 zoom-in-95 duration-300 sm:px-12">
+            <div className="mt-6 rounded-3xl border border-neutral-200 bg-white px-5 py-8 animate-in fade-in-0 zoom-in-95 duration-300 sm:px-8">
               <div className="flex flex-col items-center text-center">
                 <ScoreRing percent={percent} />
-                <h2 className={cn(headingFont.className, "mt-4 text-3xl font-semibold")}>
+                <h2 className={cn(headingFont.className, "mt-3 text-2xl font-semibold")}>
                   {percent === 100
                     ? "Perfect score!"
                     : percent >= 80
@@ -372,15 +374,15 @@ export function QuizPlayer({
                         ? "Good effort"
                         : "Keep practising"}
                 </h2>
-                <p className="mt-2 text-lg text-neutral-500">
+                <p className="mt-1 text-base text-neutral-500">
                   You got {correctCount} of {order.length} correct.
                 </p>
-                <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
                   {incorrect.length > 0 ? (
                     <button
                       type="button"
                       onClick={() => start(incorrect)}
-                      className="rounded-full bg-[#6a97c7] px-7 py-3 text-base font-medium text-white transition-colors hover:bg-[#5886b8]"
+                      className="rounded-full bg-[#6a97c7] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#5886b8]"
                     >
                       Retry {incorrect.length} incorrect
                     </button>
@@ -388,28 +390,28 @@ export function QuizPlayer({
                   <button
                     type="button"
                     onClick={() => start(questions.map((_, i) => i))}
-                    className="rounded-full border-2 border-neutral-200 px-7 py-3 text-base font-medium transition-colors hover:bg-neutral-50"
+                    className="rounded-full border-2 border-neutral-200 px-5 py-2.5 text-sm font-medium transition-colors hover:bg-neutral-50"
                   >
                     Restart quiz
                   </button>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="rounded-full px-7 py-3 text-base font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                    className="rounded-full px-5 py-2.5 text-sm font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
                   >
                     Close
                   </button>
                 </div>
               </div>
 
-              <ol className="mx-auto mt-10 grid max-w-3xl gap-3">
+              <ol className="mt-8 grid gap-2.5">
                 {order.map((qi, n) => {
                   const q = questions[qi]
                   const right = answers[qi] === q.answerIndex
                   return (
                     <li
                       key={q.id}
-                      className="flex gap-4 rounded-2xl border border-neutral-200 px-4 py-4 sm:px-6"
+                      className="flex gap-3 rounded-2xl border border-neutral-200 px-4 py-3"
                     >
                       <span
                         className={cn(
@@ -424,7 +426,7 @@ export function QuizPlayer({
                           <X className="size-4" strokeWidth={2.5} />
                         )}
                       </span>
-                      <div className="min-w-0 space-y-1 text-sm sm:text-base">
+                      <div className="min-w-0 space-y-1 text-sm">
                         <p className="font-medium">
                           {n + 1}. {q.question}
                         </p>
@@ -441,6 +443,7 @@ export function QuizPlayer({
               </ol>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
     </div>,
