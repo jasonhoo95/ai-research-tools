@@ -45,7 +45,6 @@ export default function ColumnConfig() {
     <div>
       <h2 className="mb-4 text-lg font-semibold">Column Config</h2>
       <TableSetup
-        variant="default"
         tableData={currentTable?.tableData ?? tableData}
         pageProps={{ page: 1, limit: 10 }}
         dataCallback={(data) => {

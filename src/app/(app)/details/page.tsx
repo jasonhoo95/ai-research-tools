@@ -15,7 +15,6 @@ export default function DetailsPage() {
   return (
     <div className="mx-auto w-full max-w-[1400px]">
       <TableSetup
-        variant="crm"
         tableData={tableData}
         tableColumns={CRM_COLUMNS}
         renderCell={renderCrmCell}

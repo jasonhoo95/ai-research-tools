@@ -305,6 +305,27 @@ export function ArtifactTable({
     [commitRows],
   )
 
+  const deleteColumn = React.useCallback(
+    (key: string) => {
+      const nextColumns = columnsRef.current.filter((col) => col.key !== key)
+      if (nextColumns.length === 0) return
+      columnsRef.current = nextColumns
+      setColumns(nextColumns)
+      scheduleSave()
+    },
+    [scheduleSave],
+  )
+
+  // Drag-to-reorder columns in the table.
+  const reorderColumns = React.useCallback(
+    (next: TableColumn[]) => {
+      columnsRef.current = next
+      setColumns(next)
+      scheduleSave()
+    },
+    [scheduleSave],
+  )
+
   const renderCell = React.useCallback(
     (row: TableRow, column: TableColumn, cell: unknown) => (
       <EditableText
@@ -340,7 +361,6 @@ export function ArtifactTable({
 
   return (
     <TableSetup
-      variant="crm"
       embedded
       toolbarActions={false}
       emptyLabel="rows"
@@ -350,7 +370,9 @@ export function ArtifactTable({
       renderColumnLabel={renderColumnLabel}
       onInsertRow={insertRow}
       onInsertColumn={insertColumn}
-      // The CRM variant has no pager, so show every row.
+      onDeleteColumn={deleteColumn}
+      onColumnsChange={reorderColumns}
+      // Show every row on one page.
       pageProps={{ page: 1, limit: Math.max(rows.length, 1) }}
       dataCallback={commitRows}
     />
