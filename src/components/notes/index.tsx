@@ -7,7 +7,7 @@ import GridLayout, {
     type LayoutItem,
     type ResizeHandleAxis,
 } from "react-grid-layout"
-import { GripVertical, Minus, Plus } from "lucide-react"
+import { GripVertical, Minus, Plus, Trash2 } from "lucide-react"
 import type { Ref } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Descendant } from "slate"
@@ -63,6 +63,8 @@ type MasonryGridProps = {
     ) => void
     /** When set, shows an "Add note" button in the toolbar. */
     onAddItem?: () => void
+    /** When set, each card shows a delete button on hover. */
+    onRemoveItem?: (id: string) => void
     initialColumnCount?: number
     rowHeight?: number
     className?: string
@@ -456,10 +458,25 @@ export const NOTE_DEFAULT_SHADE =
 function PinCard({
     item,
     onItemChange,
+    onRemove,
 }: {
     item: MasonryItem
     onItemChange?: MasonryGridProps["onItemChange"]
+    onRemove?: () => void
 }) {
+    // Delete takes two clicks: the first arms it (red), the second deletes.
+    const [confirmingDelete, setConfirmingDelete] =
+        useState(false)
+
+    useEffect(() => {
+        if (!confirmingDelete) return
+        const timer = setTimeout(
+            () => setConfirmingDelete(false),
+            3000,
+        )
+        return () => clearTimeout(timer)
+    }, [confirmingDelete])
+
     const [label, setLabel] =
         useState(item.label ?? "")
 
@@ -523,6 +540,7 @@ function PinCard({
         // drop-shadow filter on this wrapper because the card itself is
         // clipped (box-shadow would be clipped with it).
         <div
+            onMouseLeave={() => setConfirmingDelete(false)}
             className={cn(
                 "group/pin relative h-full min-h-0",
                 "[filter:drop-shadow(0_1px_1.5px_rgb(0_0_0/0.10))_drop-shadow(0_4px_10px_rgb(0_0_0/0.05))]",
@@ -612,22 +630,57 @@ function PinCard({
             </div>
             </div>
 
-            {/* Drag handle, tucked under the fold so it doesn't take title
-                space. Do not stopPropagation here; RGL needs the mousedown. */}
-            <div
-                role="button"
-                tabIndex={0}
-                aria-label={`Drag ${item.label ?? item.id}`}
-                className={cn(
-                    "drag-handle absolute right-1 top-[calc(var(--note-fold)+2px)] z-10",
-                    "cursor-grab touch-none select-none",
-                    "rounded-md p-1 text-(--note-ink)",
-                    "opacity-0 transition-opacity group-hover/pin:opacity-50 focus-visible:opacity-100",
-                    "hover:!opacity-100 hover:bg-black/5",
-                    "active:cursor-grabbing",
-                )}
-            >
-                <GripVertical className="pointer-events-none size-4" />
+            {/* Hover controls, tucked under the fold so they don't take
+                title space: delete, then the drag handle. */}
+            <div className="absolute right-1 top-[calc(var(--note-fold)+2px)] z-10 flex flex-col items-center gap-0.5">
+                {onRemove ? (
+                    <button
+                        type="button"
+                        aria-label={
+                            confirmingDelete
+                                ? `Confirm delete ${item.label ?? "note"}`
+                                : `Delete ${item.label ?? "note"}`
+                        }
+                        title={
+                            confirmingDelete
+                                ? "Click again to delete"
+                                : "Delete note"
+                        }
+                        onMouseDown={(event) =>
+                            event.stopPropagation()
+                        }
+                        onClick={() => {
+                            if (confirmingDelete) onRemove()
+                            else setConfirmingDelete(true)
+                        }}
+                        className={cn(
+                            "rounded-md p-1 transition-[opacity,color,background-color]",
+                            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--note-ink)/30",
+                            confirmingDelete
+                                ? "bg-red-600 text-white opacity-100 shadow-sm hover:bg-red-700"
+                                : "bg-(--note-bg) text-(--note-ink) opacity-0 group-hover/pin:opacity-60 hover:!opacity-100 hover:bg-red-50 hover:text-red-600",
+                        )}
+                    >
+                        <Trash2 className="pointer-events-none size-4" />
+                    </button>
+                ) : null}
+
+                {/* Do not stopPropagation here; RGL needs the mousedown. */}
+                <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Drag ${item.label ?? item.id}`}
+                    className={cn(
+                        "drag-handle",
+                        "cursor-grab touch-none select-none",
+                        "rounded-md bg-(--note-bg) p-1 text-(--note-ink)",
+                        "opacity-0 transition-opacity group-hover/pin:opacity-50 focus-visible:opacity-100",
+                        "hover:!opacity-100 hover:bg-black/5",
+                        "active:cursor-grabbing",
+                    )}
+                >
+                    <GripVertical className="pointer-events-none size-4" />
+                </div>
             </div>
 
             {/* Folded corner */}
@@ -656,6 +709,7 @@ export function NotesGrid({
     onLayoutCommit,
     onItemChange,
     onAddItem,
+    onRemoveItem,
     initialColumnCount = 4,
     rowHeight = ROW_HEIGHT,
     className,
@@ -689,9 +743,15 @@ export function NotesGrid({
      * Give newly added items a slot in the grid.
      */
     useEffect(() => {
+        const ids = new Set(
+            items.map((item) => item.id),
+        )
         setLayout((prev) =>
             appendMissingToLayout(
-                prev,
+                // Drop slots of removed items.
+                prev.filter((entry) =>
+                    ids.has(entry.i),
+                ),
                 items,
                 columnCount,
             ),
@@ -1001,6 +1061,14 @@ export function NotesGrid({
                                             }
                                             onItemChange={
                                                 onItemChange
+                                            }
+                                            onRemove={
+                                                onRemoveItem
+                                                    ? () =>
+                                                          onRemoveItem(
+                                                              item.id,
+                                                          )
+                                                    : undefined
                                             }
                                         />
                                     </div>

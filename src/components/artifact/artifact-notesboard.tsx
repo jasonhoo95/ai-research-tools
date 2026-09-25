@@ -174,6 +174,14 @@ export function ArtifactNotesboard({
     scheduleSave()
   }, [handleReorder, scheduleSave])
 
+  const handleRemoveNote = React.useCallback(
+    (id: string) => {
+      handleReorder(itemsRef.current.filter((item) => item.id !== id))
+      scheduleSave()
+    },
+    [handleReorder, scheduleSave],
+  )
+
   const handleColumnsChange = React.useCallback(
     (count: number) => {
       columnCountRef.current = count
@@ -190,6 +198,7 @@ export function ArtifactNotesboard({
       onItemChange={handleItemChange}
       onColumnsChange={handleColumnsChange}
       onAddItem={handleAddNote}
+      onRemoveItem={handleRemoveNote}
       initialColumnCount={
         artifact.columnCount ?? Math.min(3, Math.max(1, artifact.notes.length))
       }
