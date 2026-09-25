@@ -534,6 +534,9 @@ export default function TableSetup({
     dataCallback,
     searchEnabled = false,
     variant = 'crm',
+    embedded = false,
+    toolbarActions = true,
+    emptyLabel = 'leads',
 }: {
     tableData: DataRow[];
     tableColumns: TableColumn[];
@@ -545,6 +548,12 @@ export default function TableSetup({
     dataCallback: (data: DataRow[]) => void;
     searchEnabled?: boolean;
     variant?: 'default' | 'crm';
+    /** Drop the full-page shell (height, padding, background) when placed inside another page. */
+    embedded?: boolean;
+    /** Show the CRM toolbar's lead actions (filter, import, add lead…) next to search. */
+    toolbarActions?: boolean;
+    /** Plural noun for the empty state, e.g. "No leads found". */
+    emptyLabel?: string;
 }) {
     const isCrm = variant === 'crm';
     const [data, setData] = useState<DataRow[]>(tableData);
@@ -804,12 +813,14 @@ export default function TableSetup({
         'crm-checkbox rounded-[5px] border-[#d4d4d8] data-checked:border-[#f97316] data-checked:bg-[#f97316] data-checked:text-white';
 
     return (
-        <div className={isCrm ? 'crm-table-shell' : ''}>
+        <div className={isCrm && !embedded ? 'crm-table-shell' : ''}>
             {isCrm ? (
                 <CrmToolbar
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     onAddLead={handleAddColumn}
+                    showActions={toolbarActions}
+                    resultCount={searchTerm.trim() ? sortedData.length : undefined}
                     className='mb-5'
                 />
             ) : null}
@@ -835,11 +846,12 @@ export default function TableSetup({
             ) : null}
 
             <div className={isCrm ? 'overflow-hidden rounded-2xl border border-[#ececef] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.04)]' : ''}>
+            {/* DndContext renders hidden a11y <div>s, so it must wrap the <table>, not sit inside it. */}
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleColumnDragEnd}>
             <Table className={isCrm ? 'crm-table bg-white' : 'overflow-hidden rounded-md bg-white shadow-md'}>
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleColumnDragEnd}>
                     <SortableContext
                         items={columns.map((column) => column.key)}
                         strategy={horizontalListSortingStrategy}>
@@ -930,8 +942,8 @@ export default function TableSetup({
                                         colSpan={columns.length + 2}
                                         className='py-16 text-center text-sm text-[#a1a1aa]'>
                                         {searchTerm.trim()
-                                            ? `No leads found for "${searchTerm.trim()}".`
-                                            : 'No leads to display.'}
+                                            ? `No ${emptyLabel} found for "${searchTerm.trim()}".`
+                                            : `No ${emptyLabel} to display.`}
                                     </TableCell>
                                 </TableRow>
                             ) : null}
@@ -987,7 +999,6 @@ export default function TableSetup({
                             ) : null}
                         </TableBody>
                     </SortableContext>
-                </DndContext>
 
                 {/* Empty State */}
                 {/* {filteredData.length === 0 && (
@@ -1034,6 +1045,7 @@ export default function TableSetup({
                     </TableFooter>
                 )}
             </Table>
+            </DndContext>
             </div>
 
             {!isCrm ? (
@@ -1048,8 +1060,10 @@ export default function TableSetup({
                     count={selectedRows.length}
                     onDiscard={() => setSelectedRows([])}
                     onDelete={() => {
-                        setData((prev) => prev.filter((row) => !selectedRows.includes(row.id)));
+                        const remaining = data.filter((row) => !selectedRows.includes(row.id));
+                        setData(remaining);
                         setSelectedRows([]);
+                        dataCallback(remaining);
                     }}
                 />
             ) : null}

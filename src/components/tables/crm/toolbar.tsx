@@ -19,6 +19,10 @@ type CrmToolbarProps = {
   searchTerm: string
   onSearchChange: (value: string) => void
   onAddLead?: () => void
+  /** Show filter / sort / view / import / export / add buttons. */
+  showActions?: boolean
+  /** Number of matching rows, shown while searching. */
+  resultCount?: number
   className?: string
 }
 
@@ -26,6 +30,8 @@ export function CrmToolbar({
   searchTerm,
   onSearchChange,
   onAddLead,
+  showActions = true,
+  resultCount,
   className,
 }: CrmToolbarProps) {
   return (
@@ -40,6 +46,13 @@ export function CrmToolbar({
         />
       </div>
 
+      {resultCount !== undefined ? (
+        <span className="text-sm text-[#71717a]" aria-live="polite">
+          {resultCount} {resultCount === 1 ? "result" : "results"}
+        </span>
+      ) : null}
+
+      {showActions ? (
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
@@ -100,6 +113,7 @@ export function CrmToolbar({
           Add Lead
         </Button>
       </div>
+      ) : null}
     </div>
   )
 }

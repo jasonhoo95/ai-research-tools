@@ -261,7 +261,7 @@ export default function ArtifactFromMessagePage() {
 
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-10">
         {artifact.kind === "chart" && <ArtifactChart artifact={artifact} />}
-        {artifact.kind === "table" && <ArtifactTable artifact={artifact} />}
+        {artifact.kind === "table" && <ArtifactTable data={view} artifact={artifact} />}
         {artifact.kind === "slide" && <ArtifactSlides data={view} artifact={artifact} />}
         {artifact.kind === "notesboard" && (
           <ArtifactNotesboard data={view} artifact={artifact} />
