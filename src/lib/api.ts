@@ -4,32 +4,10 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios"
 
+import { ACCESS_COOKIE, readCookie } from "@/lib/auth-session"
+
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000/api"
-
-const TOKEN_STORAGE_KEY = "ai-research-tools.token"
-
-function getToken(): string | null {
-  if (typeof window === "undefined") return null
-  try {
-    return window.localStorage.getItem(TOKEN_STORAGE_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function setAuthToken(token: string | null) {
-  if (typeof window === "undefined") return
-  try {
-    if (token) {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
-    } else {
-      window.localStorage.removeItem(TOKEN_STORAGE_KEY)
-    }
-  } catch {
-    // storage disabled — request interceptor will simply skip the header
-  }
-}
 
 export interface ApiErrorPayload {
   message: string
@@ -59,9 +37,15 @@ export const api: AxiosInstance = axios.create({
   withCredentials: false,
 })
 
-/** Forward auth + request id from an incoming Next.js request to the backend. */
+/**
+ * Forward auth + request id from an incoming Next.js request to the backend.
+ * The access token comes from the httpOnly session cookie (or an explicit
+ * Authorization header) and is sent on as a bearer token.
+ */
 export function headersFromIncoming(incoming: Headers): Record<string, string> {
-  const auth = incoming.get("authorization")
+  const cookieToken = readCookie(incoming.get("cookie"), ACCESS_COOKIE)
+  const auth =
+    incoming.get("authorization") ?? (cookieToken ? `Bearer ${cookieToken}` : null)
   const requestId = incoming.get("x-request-id") ?? crypto.randomUUID()
   const headers: Record<string, string> = {
     "X-Request-Id": requestId,
@@ -90,10 +74,6 @@ export function proxyErrorPayload(
 
 function attachInterceptors(instance: AxiosInstance) {
   instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-    const token = getToken()
-    if (token) {
-      config.headers.set?.("Authorization", `Bearer ${token}`)
-    }
     if (!config.headers.get?.("X-Request-Id")) {
       config.headers.set?.(
         "X-Request-Id",
@@ -105,17 +85,15 @@ function attachInterceptors(instance: AxiosInstance) {
 
   instance.interceptors.response.use(
     (response) => response,
-    (error: AxiosError<ApiErrorPayload>) => {
+    (error: AxiosError<ApiErrorPayload> | ApiError) => {
+      // Already converted (e.g. a request replayed after a token refresh).
+      if (error instanceof ApiError) return Promise.reject(error)
       if (error.response) {
         const { status, data } = error.response
         const payload: ApiErrorPayload =
           data && typeof data === "object"
             ? data
             : { message: error.message || "Request failed" }
-
-        if (status === 401 && typeof window !== "undefined") {
-          setAuthToken(null)
-        }
 
         const message =
           (payload as ApiErrorPayload).message ||
@@ -149,6 +127,50 @@ export const appApi: AxiosInstance = axios.create({
   headers: {
     Accept: "application/json",
   },
+})
+
+let refreshing: Promise<boolean> | null = null
+
+/**
+ * Swap the refresh-token cookie for a new token pair. Concurrent 401s share
+ * one call, since Supabase rotates the refresh token on every use.
+ */
+export function refreshSession(): Promise<boolean> {
+  refreshing ??= axios
+    .post("/api/auth/refresh", null, { timeout: 15_000 })
+    .then(
+      () => true,
+      () => false,
+    )
+    .finally(() => {
+      refreshing = null
+    })
+  return refreshing
+}
+
+function redirectToLogin() {
+  const { pathname, search } = window.location
+  if (pathname === "/login" || pathname === "/signup") return
+  window.location.assign(`/login?next=${encodeURIComponent(pathname + search)}`)
+}
+
+// An expired access token makes the backend answer 401: refresh once and
+// replay the request; if the refresh token is gone too, go to login.
+appApi.interceptors.response.use(undefined, async (error: AxiosError) => {
+  const config = error.config as
+    | (InternalAxiosRequestConfig & { _retriedAfterRefresh?: boolean })
+    | undefined
+  if (
+    typeof window !== "undefined" &&
+    error.response?.status === 401 &&
+    config &&
+    !config._retriedAfterRefresh
+  ) {
+    config._retriedAfterRefresh = true
+    if (await refreshSession()) return appApi(config)
+    redirectToLogin()
+  }
+  return Promise.reject(error)
 })
 
 attachInterceptors(appApi)

@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 
@@ -13,9 +12,9 @@ import {
   SocialAuthButtons,
 } from "@/components/auth/auth-card"
 import { signupSchema, type SignupValues } from "@/lib/auth-schema"
+import { startGoogleLogin } from "@/lib/auth-client"
 
 export default function SignupPage() {
-  const router = useRouter()
   const [step, setStep] = React.useState<"email" | "details">("email")
   const [message, setMessage] = React.useState<string | null>(null)
 
@@ -34,7 +33,13 @@ export default function SignupPage() {
   const email = form.watch("email")
 
   const handleSocial = (provider: string) => {
-    setMessage(`Continue with ${provider} is not wired yet.`)
+    if (provider === "google") {
+      // Google sign-in creates the account on first login.
+      setMessage("Redirecting to Google…")
+      startGoogleLogin()
+      return
+    }
+    setMessage(`Continue with ${provider} is not available yet — please use Google.`)
   }
 
   const handleEmailContinue = () => {
@@ -48,10 +53,8 @@ export default function SignupPage() {
     setMessage(null)
   }
 
-  const onSubmit = async (values: SignupValues) => {
-    await new Promise((r) => setTimeout(r, 700))
-    console.log("signup submit", values)
-    router.push("/dashboard")
+  const onSubmit = async (_values: SignupValues) => {
+    setMessage("Email sign-up is not available yet — please continue with Google.")
   }
 
   return (

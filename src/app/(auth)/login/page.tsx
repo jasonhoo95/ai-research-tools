@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 
@@ -13,9 +12,9 @@ import {
   SocialAuthButtons,
 } from "@/components/auth/auth-card"
 import { loginSchema, type LoginValues } from "@/lib/auth-schema"
+import { loginErrorFromLocation, startGoogleLogin } from "@/lib/auth-client"
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = React.useState("")
   const [showPassword, setShowPassword] = React.useState(false)
   const [password, setPassword] = React.useState("")
@@ -27,8 +26,19 @@ export default function LoginPage() {
     mode: "onTouched",
   })
 
+  // Show why a Google login bounced back here (set by /auth/callback).
+  React.useEffect(() => {
+    const error = loginErrorFromLocation()
+    if (error) setMessage(error)
+  }, [])
+
   const handleSocial = (provider: string) => {
-    setMessage(`Continue with ${provider} is not wired yet.`)
+    if (provider === "google") {
+      setMessage("Redirecting to Google…")
+      startGoogleLogin()
+      return
+    }
+    setMessage(`Continue with ${provider} is not available yet — please use Google.`)
   }
 
   const handleEmailContinue = () => {
@@ -41,10 +51,8 @@ export default function LoginPage() {
     setMessage(null)
   }
 
-  const onSubmit = async (values: LoginValues) => {
-    await new Promise((r) => setTimeout(r, 600))
-    console.log("login submit", values)
-    router.push("/dashboard")
+  const onSubmit = async (_values: LoginValues) => {
+    setMessage("Email sign-in is not available yet — please continue with Google.")
   }
 
   return (

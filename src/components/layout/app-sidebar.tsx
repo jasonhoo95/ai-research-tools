@@ -10,13 +10,31 @@ import {
   Home,
   Inbox,
   ListTodo,
+  LogOut,
   Search,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { fetchCurrentUser, logout } from "@/lib/auth-client"
+import type { AuthUser } from "@/lib/auth-session"
 import { chatRepo, type ChatRow } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
+
+function initials(user: AuthUser | null) {
+  const source = user?.name || user?.email || ""
+  const parts = source.split(/[\s@._-]+/).filter(Boolean)
+  return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "") || "?"
+}
 
 const mainNav = [
   { href: "/dashboard", label: "Home", icon: Home },
@@ -30,6 +48,13 @@ export function AppSidebar() {
   const [recentOpen, setRecentOpen] = useState(true)
   const [foldersOpen, setFoldersOpen] = useState(true)
   const [recentChats, setRecentChats] = useState<ChatRow[]>([])
+  const [user, setUser] = useState<AuthUser | null>(null)
+
+  useEffect(() => {
+    fetchCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+  }, [])
 
   useEffect(() => {
     chatRepo
@@ -41,17 +66,39 @@ export function AppSidebar() {
   return (
     <aside className="flex h-screen w-[248px] shrink-0 flex-col border-r border-[#ececef] bg-[#f7f7f8]">
       <div className="flex items-center justify-between gap-2 px-4 pt-5 pb-4">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <Avatar className="size-9 border border-white shadow-sm">
-            <AvatarFallback className="bg-[#ffe8d6] text-sm font-semibold text-[#ea580c]">
-              JH
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-[#27272a]">Jason hoo</p>
-            <p className="text-xs text-[#a1a1aa]">Free Plan</p>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label="Account menu"
+            className="-m-1 flex min-w-0 items-center gap-2.5 rounded-lg p-1 text-left transition-colors hover:bg-white data-popup-open:bg-white"
+          >
+            <Avatar className="size-9 border border-white shadow-sm">
+              {user?.avatarUrl ? (
+                <AvatarImage src={user.avatarUrl} alt="" referrerPolicy="no-referrer" />
+              ) : null}
+              <AvatarFallback className="bg-[#ffe8d6] text-sm font-semibold uppercase text-[#ea580c]">
+                {initials(user)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[#27272a]">
+                {user?.name || user?.email || "…"}
+              </p>
+              <p className="text-xs text-[#a1a1aa]">Free Plan</p>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={6} className="w-56">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="truncate">
+                {user?.email ?? "Signed in"}
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => void logout()}>
+              <LogOut />
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
