@@ -537,6 +537,7 @@ export default function TableSetup({
     embedded = false,
     toolbarActions = true,
     emptyLabel = 'leads',
+    renderColumnLabel,
 }: {
     tableData: DataRow[];
     tableColumns: TableColumn[];
@@ -554,6 +555,8 @@ export default function TableSetup({
     toolbarActions?: boolean;
     /** Plural noun for the empty state, e.g. "No leads found". */
     emptyLabel?: string;
+    /** CRM variant: custom header label (e.g. an inline editor); sort arrows stay. */
+    renderColumnLabel?: (column: TableColumn) => React.ReactNode;
 }) {
     const isCrm = variant === 'crm';
     const [data, setData] = useState<DataRow[]>(tableData);
@@ -872,6 +875,7 @@ export default function TableSetup({
                                         <TableHead key={column.key} className='crm-table-head'>
                                             <CrmColumnHeader
                                                 label={column.label}
+                                                labelContent={renderColumnLabel?.(column)}
                                                 activeDirection={
                                                     columnSort?.key === column.key
                                                         ? columnSort.direction
