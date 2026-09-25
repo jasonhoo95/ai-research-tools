@@ -18,6 +18,7 @@ import { ArtifactSlides } from "@/components/artifact/artifact-slides"
 import { ArtifactNotes } from "@/components/artifact/artifact-notes"
 import { ArtifactNotesboard } from "@/components/artifact/artifact-notesboard"
 import { ArtifactBio } from "@/components/artifact/artifact-bio"
+import { ArtifactQuiz } from "@/components/artifact/artifact-quiz"
 
 const KNOWN_KINDS: ReadonlyArray<Artifact["kind"]> = [
   "chart",
@@ -26,6 +27,7 @@ const KNOWN_KINDS: ReadonlyArray<Artifact["kind"]> = [
   "notesboard",
   "notes",
   "bio",
+  "quiz",
 ]
 
 function artifactFromResult(data: MessageArtifactResult): Artifact | null {
@@ -52,6 +54,8 @@ function isRenderableArtifact(value: unknown): value is Artifact {
       return typeof a.content === "string" || Array.isArray(a.content)
     case "bio":
       return Array.isArray(a.sections)
+    case "quiz":
+      return Array.isArray(a.questions)
     default:
       return false
   }
@@ -264,6 +268,7 @@ export default function ArtifactFromMessagePage() {
         )}
         {artifact.kind === "notes" && <ArtifactNotes data={view} artifact={artifact} />}
         {artifact.kind === "bio" && <ArtifactBio data={view} artifact={artifact} />}
+        {artifact.kind === "quiz" && <ArtifactQuiz data={view} artifact={artifact} />}
       </div>
 
       {artifact.kind === "chart" && (

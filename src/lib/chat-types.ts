@@ -32,7 +32,8 @@ export type ArtifactKind =
 	| "slide"
 	| "notesboard"
 	| "notes"
-	| "bio";
+	| "bio"
+	| "quiz";
 
 export interface ChartDataPoint {
 	label: string;
@@ -141,13 +142,36 @@ export interface BioArtifact {
 	sections: BioSection[];
 }
 
+export type QuizDifficulty = "easy" | "medium" | "hard";
+
+export interface QuizQuestion {
+	id: string;
+	question: string;
+	/** 2-6 answer options. */
+	options: string[];
+	/** Index into options of the correct answer. */
+	answerIndex: number;
+	/** Shown after answering. */
+	explanation: string;
+	difficulty: QuizDifficulty;
+}
+
+/** Multiple-choice quiz; questions are asked in array order. */
+export interface QuizArtifact {
+	kind: "quiz";
+	title: string;
+	description?: string;
+	questions: QuizQuestion[];
+}
+
 export type Artifact =
 	| ChartArtifact
 	| TableArtifact
 	| SlideArtifact
 	| NotesboardArtifact
 	| NotesArtifact
-	| BioArtifact;
+	| BioArtifact
+	| QuizArtifact;
 
 export interface GeneratedArtifact {
 	id: string;
