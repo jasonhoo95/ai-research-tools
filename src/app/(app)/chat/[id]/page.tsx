@@ -134,32 +134,34 @@ export default function ChatConversationPage() {
   const [highlightId, setHighlightId] = React.useState<string | null>(null)
   const [showJumpToLatest, setShowJumpToLatest] = React.useState(false)
 
-  const savedArtifactIds = React.useMemo(
-    () =>
-      new Set(
-        pinnedArtifacts.flatMap((row) => {
-          const content = normalizeGeneratedArtifact(row.content)
-          return content ? [content.id] : []
-        }),
-      ),
-    [pinnedArtifacts],
-  )
+  // artifact_chat row ids keyed by what the bubble buttons refer to, so a
+  // saved item can be highlighted and removed again. Artifacts saved from a
+  // bubble store the whole message: content.id is the message id and
+  // content.artifact.id the artifact id, so both are indexed.
+  const { artifactRowIds, noteRowIds } = React.useMemo(() => {
+    const artifacts = new Map<string, string[]>()
+    const notes = new Map<string, string[]>()
+    const add = (map: Map<string, string[]>, key: string, rowId: string) =>
+      map.set(key, [...(map.get(key) ?? []), rowId])
+
+    for (const row of pinnedArtifacts) {
+      const content = normalizeGeneratedArtifact(row.content)
+      if (!content) continue
+      const inner = content.artifact as { kind: string; id?: string }
+      if (inner.kind === "notes") {
+        add(notes, content.id, row.id)
+        continue
+      }
+      add(artifacts, content.id, row.id)
+      if (inner.id && inner.id !== content.id) add(artifacts, inner.id, row.id)
+    }
+    return { artifactRowIds: artifacts, noteRowIds: notes }
+  }, [pinnedArtifacts])
 
   const notesboardRow = React.useMemo(
     () => findChatNotesboard(pinnedArtifacts),
     [pinnedArtifacts],
   )
-
-  const notesMessageIds = React.useMemo(() => {
-    console.log("pinnedArtifacts", pinnedArtifacts)
-    const notes = pinnedArtifacts.filter((row) => row.content.artifact.kind === "notes")
-    return new Set(notes.map((row) => row.content.id))
-  }, [pinnedArtifacts])
-
-
-
-
-  console.log("pinnedArtifacts", pinnedArtifacts)
 
 
   const chatArtifacts = React.useMemo<ChatArtifactItem[]>(
@@ -491,6 +493,28 @@ export default function ChatConversationPage() {
     }
   }
 
+  /** Delete saved rows (all duplicates) for one bubble button. */
+  const handleUnsave = async (
+    rowIds: string[],
+    key: string,
+    setBusy: React.Dispatch<React.SetStateAction<Set<string>>>,
+  ) => {
+    if (!chatId) return
+    setBusy((prev) => new Set(prev).add(key))
+    try {
+      await Promise.all(rowIds.map((id) => chatRepo.deleteArtifact(chatId, id)))
+      setPinnedArtifacts((prev) => prev.filter((row) => !rowIds.includes(row.id)))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
   const handleSaveArtifact = async (content: GeneratedArtifact) => {
     if (!chatId) return
     try {
@@ -654,11 +678,23 @@ export default function ChatConversationPage() {
                 m.createdAt &&
                 (!prevCreated || dayKey(prevCreated) !== dayKey(m.createdAt))
               const artifactId = m.artifact?.id
+              const artifactRows = artifactId ? artifactRowIds.get(artifactId) : undefined
+              const noteRows = noteRowIds.get(m.id)
               const saveState = artifactId
                 ? {
-                  saved: savedArtifactIds.has(artifactId),
+                  saved: Boolean(artifactRows),
                   saving: savingArtifactIds.has(artifactId),
-                  onSave: () => handleSaveArtifact(m),
+                  onSave: async () => {
+                    setSavingArtifactIds((prev) => new Set(prev).add(artifactId))
+                    await handleSaveArtifact(m as unknown as GeneratedArtifact)
+                    setSavingArtifactIds((prev) => {
+                      const next = new Set(prev)
+                      next.delete(artifactId)
+                      return next
+                    })
+                  },
+                  onRemove: () =>
+                    handleUnsave(artifactRows ?? [], artifactId, setSavingArtifactIds),
                 }
                 : undefined
               return (
@@ -675,9 +711,11 @@ export default function ChatConversationPage() {
                   message={m}
                   artifactSaveState={saveState}
                   noteState={{
-                    saved: notesMessageIds.has(m.id),
+                    saved: Boolean(noteRows),
                     saving: addingNoteMessageIds.has(m.id),
                     onAdd: () => handleAddToNotes(m),
+                    onRemove: () =>
+                      handleUnsave(noteRows ?? [], m.id, setAddingNoteMessageIds),
                   }}
                   chatbotId={chatId}
                 />

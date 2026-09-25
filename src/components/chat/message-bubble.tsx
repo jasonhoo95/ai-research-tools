@@ -35,12 +35,16 @@ export interface ArtifactSaveState {
   saved: boolean
   saving: boolean
   onSave: () => void
+  /** Unsave: deletes the saved row from this chat's artifacts. */
+  onRemove: () => void
 }
 
 export interface MessageNoteState {
   saved: boolean
   saving: boolean
   onAdd: () => void
+  /** Deletes the saved note from this chat's artifacts. */
+  onRemove: () => void
 }
 
 export function MessageBubble({
@@ -118,22 +122,24 @@ export function MessageBubble({
                 provider={message.searchProvider}
               />
             ) : null}
-            {!isUser && !message.artifact && (
+            {showAddNotes && !isUser && !message.artifact && (
               <button
                 type="button"
                 onClick={() => {
-                  if (noteState.saved || noteState.saving) return
-                  noteState.onAdd()
+                  if (noteState.saving) return
+                  if (noteState.saved) noteState.onRemove()
+                  else noteState.onAdd()
                 }}
-                disabled={noteState.saved || noteState.saving}
+                disabled={noteState.saving}
+                aria-pressed={noteState.saved}
                 aria-label={
                   noteState.saved
-                    ? "Message added to notes"
+                    ? "Remove message from notes"
                     : "Add message to notes"
                 }
                 title={
                   noteState.saved
-                    ? "Added to notes"
+                    ? "In notes — click to remove"
                     : noteState.saving
                       ? "Adding…"
                       : "Add to notes"
@@ -202,16 +208,22 @@ function ArtifactCard({
             type="button"
             onClick={(e) => {
               e.preventDefault()
-              if (saveState.saved || saveState.saving) return
-              saveState.onSave()
+              if (saveState.saving) return
+              if (saveState.saved) saveState.onRemove()
+              else saveState.onSave()
             }}
-            disabled={saveState.saved || saveState.saving}
+            disabled={saveState.saving}
+            aria-pressed={saveState.saved}
             aria-label={
               saveState.saved
-                ? "Artifact saved to this chat"
+                ? "Remove artifact from this chat"
                 : "Save artifact to this chat"
             }
-            title={saveState.saved ? "Saved" : "Save to this chat"}
+            title={
+              saveState.saved
+                ? "Saved — click to remove"
+                : "Save to this chat"
+            }
             className={cn(
               "flex h-7 w-7 items-center justify-center rounded-full border transition-colors",
               saveState.saved
