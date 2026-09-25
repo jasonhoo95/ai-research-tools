@@ -32,6 +32,10 @@ import { Composer } from "@/components/chat/composer"
 import { DateSeparator, dayKey } from "@/components/chat/date-separator"
 import { MessageSearch } from "@/components/chat/message-search"
 import {
+  CreateArtifactMenu,
+  type CreateArtifactInput,
+} from "@/components/chat/create-artifact-menu"
+import {
   ArtifactsPanel,
   type ChatArtifactItem,
 } from "@/components/chat/artifacts-panel"
@@ -515,6 +519,31 @@ export default function ChatConversationPage() {
     }
   }
 
+  /** Generate an artifact from the + menu and pin it to the Artifacts panel. */
+  const handleCreateArtifact = async (input: CreateArtifactInput) => {
+    if (!chatId) return
+    const history = toHistory(messages).filter((m) => m.content.trim())
+    try {
+      const generated = await chatClient.generateArtifact({
+        kind: input.kind,
+        title: input.title || undefined,
+        prompt: input.prompt,
+        history,
+      })
+      artifactsStore.save(generated)
+      const row = await chatRepo.saveArtifact(chatId, generated)
+      setPinnedArtifacts((prev) => [row, ...prev])
+      setArtifactsOpen(true)
+    } catch (err) {
+      // Shown inside the dialog, which stays open for another try.
+      throw new Error(
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : "Could not create the artifact.",
+      )
+    }
+  }
+
   const handleSaveArtifact = async (content: GeneratedArtifact) => {
     if (!chatId) return
     try {
@@ -648,7 +677,8 @@ export default function ChatConversationPage() {
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
         {chatId && (
-          <div className="absolute right-4 top-3 z-20">
+          <div className="absolute right-4 top-3 z-20 flex items-center gap-2">
+            <CreateArtifactMenu onCreate={handleCreateArtifact} />
             <MessageSearch chatId={chatId} onSelect={jumpToMessage} />
           </div>
         )}
