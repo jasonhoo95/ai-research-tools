@@ -526,6 +526,20 @@ const AddColumnComponent = () => {
     );
 };
 
+/** Round "+" on a row's top or bottom edge (Airtable-style), shown on row hover. */
+function RowInsertButton({ edge, onClick }: { edge: 'top' | 'bottom'; onClick: () => void }) {
+    return (
+        <button
+            type='button'
+            aria-label={edge === 'top' ? 'Insert row above' : 'Insert row below'}
+            title={edge === 'top' ? 'Insert row above' : 'Insert row below'}
+            onClick={onClick}
+            className={`absolute left-1/2 z-10 flex size-[18px] -translate-x-1/2 items-center justify-center rounded-full border border-[#fed7aa] bg-white text-[#f97316] opacity-0 shadow-sm transition-[opacity,transform] group-hover:opacity-100 hover:scale-110 hover:bg-[#fff7ed] focus-visible:opacity-100 ${edge === 'top' ? 'top-0 -translate-y-1/2' : 'bottom-0 translate-y-1/2'}`}>
+            <Plus className='size-3' strokeWidth={2.5} />
+        </button>
+    );
+}
+
 export default function TableSetup({
     tableData,
     tableColumns,
@@ -538,6 +552,8 @@ export default function TableSetup({
     toolbarActions = true,
     emptyLabel = 'leads',
     renderColumnLabel,
+    onInsertRow,
+    onInsertColumn,
 }: {
     tableData: DataRow[];
     tableColumns: TableColumn[];
@@ -557,6 +573,10 @@ export default function TableSetup({
     emptyLabel?: string;
     /** CRM variant: custom header label (e.g. an inline editor); sort arrows stay. */
     renderColumnLabel?: (column: TableColumn) => React.ReactNode;
+    /** CRM variant: show Airtable-style "+" to insert a row above/below a row, and an "Add row" bar. */
+    onInsertRow?: (anchorRowId: DataRow['id'] | null, position: 'above' | 'below') => void;
+    /** CRM variant: show "+" on a header's edges to insert a column left/right of it. */
+    onInsertColumn?: (anchorKey: string, side: 'left' | 'right') => void;
 }) {
     const isCrm = variant === 'crm';
     const [data, setData] = useState<DataRow[]>(tableData);
@@ -596,6 +616,10 @@ export default function TableSetup({
     useEffect(() => {
         setData(tableData);
     }, [tableData]);
+
+    useEffect(() => {
+        setItemsPerPage(pageProps.limit);
+    }, [pageProps.limit]);
 
     const handleSaveNewColumn = () => {
         if (newColumnName.trim()) {
@@ -664,6 +688,8 @@ export default function TableSetup({
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, columnSort]);
+
+    const canInsertBetween = !columnSort && !searchTerm.trim();
 
     // Calculate pagination
     const totalPages = Math.max(1, Math.ceil(sortedData.length / itemsPerPage));
@@ -872,7 +898,20 @@ export default function TableSetup({
                                 </TableHead>
                                 {columns.map((column) =>
                                     isCrm ? (
-                                        <TableHead key={column.key} className='crm-table-head'>
+                                        <TableHead key={column.key} className='crm-table-head group/col relative'>
+                                            {onInsertColumn
+                                                ? (['left', 'right'] as const).map((side) => (
+                                                      <button
+                                                          key={side}
+                                                          type='button'
+                                                          aria-label={`Insert column ${side} of ${column.label}`}
+                                                          title={`Insert column ${side}`}
+                                                          onClick={() => onInsertColumn(column.key, side)}
+                                                          className={`absolute top-1/2 z-10 flex size-[18px] -translate-y-1/2 items-center justify-center rounded-full border border-[#fed7aa] bg-white text-[#f97316] opacity-0 shadow-sm transition-[opacity,transform] group-hover/col:opacity-100 hover:scale-110 hover:bg-[#fff7ed] focus-visible:opacity-100 ${side === 'left' ? 'left-0 -translate-x-1/2' : 'right-0 translate-x-1/2'}`}>
+                                                          <Plus className='size-3' strokeWidth={2.5} />
+                                                      </button>
+                                                  ))
+                                                : null}
                                             <CrmColumnHeader
                                                 label={column.label}
                                                 labelContent={renderColumnLabel?.(column)}
@@ -910,11 +949,28 @@ export default function TableSetup({
                         {/* Table Body */}
                         <TableBody className={isCrm ? 'crm-table-body divide-y divide-[#f1f1f4]' : 'divide-y divide-gray-100'}>
                             {isCrm
-                                ? paginatedData.map((row) => (
+                                ? paginatedData.map((row, rowIndex) => (
                                       <TableRow
                                           key={row.id}
                                           className={`crm-table-row group border-0 ${selectedRows.includes(row.id) ? 'crm-table-row-selected' : ''}`}>
-                                          <TableCell className='crm-checkbox-col'>
+                                          <TableCell className='crm-checkbox-col relative'>
+                                              {/* "Insert above/below" only makes sense in the stored order. */}
+                                              {onInsertRow && canInsertBetween ? (
+                                                  <>
+                                                      {rowIndex === 0 ? (
+                                                          <RowInsertButton
+                                                              edge='top'
+                                                              onClick={() => onInsertRow(row.id, 'above')}
+                                                          />
+                                                      ) : null}
+                                                      {rowIndex < paginatedData.length - 1 ? (
+                                                          <RowInsertButton
+                                                              edge='bottom'
+                                                              onClick={() => onInsertRow(row.id, 'below')}
+                                                          />
+                                                      ) : null}
+                                                  </>
+                                              ) : null}
                                               <div className='flex items-center justify-center'>
                                                   <Checkbox
                                                       className={crmCheckboxClass}
@@ -1050,6 +1106,19 @@ export default function TableSetup({
                 )}
             </Table>
             </DndContext>
+            {isCrm && onInsertRow ? (
+                <button
+                    type='button'
+                    onClick={() => {
+                        // A blank row would be hidden by an active search.
+                        setSearchTerm('');
+                        onInsertRow(null, 'below');
+                    }}
+                    className='flex w-full items-center gap-2 border-t border-[#f1f1f4] px-5 py-3 text-left text-sm text-[#a1a1aa] transition-colors hover:bg-[#fafafa] hover:text-[#52525b]'>
+                    <Plus className='size-4' />
+                    Add row
+                </button>
+            ) : null}
             </div>
 
             {!isCrm ? (

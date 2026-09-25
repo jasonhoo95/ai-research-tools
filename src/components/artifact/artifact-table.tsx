@@ -57,6 +57,9 @@ function EditableText({
   placeholder = "Empty",
   displayClassName,
   inputClassName,
+  autoEdit = false,
+  onAutoEditDone,
+  selectOnEdit = false,
 }: {
   value: string
   onCommit: (value: string) => void
@@ -65,8 +68,13 @@ function EditableText({
   placeholder?: string
   displayClassName?: string
   inputClassName?: string
+  /** Start in edit mode (e.g. a just-inserted row or column). */
+  autoEdit?: boolean
+  onAutoEditDone?: () => void
+  /** Select the text when editing starts, so typing replaces it. */
+  selectOnEdit?: boolean
 }) {
-  const [editing, setEditing] = React.useState(false)
+  const [editing, setEditing] = React.useState(autoEdit)
   const [draft, setDraft] = React.useState(value)
   const ref = React.useRef<HTMLTextAreaElement>(null)
   const cancelledRef = React.useRef(false)
@@ -84,8 +92,15 @@ function EditableText({
     const el = ref.current
     if (!editing || !el) return
     el.focus()
-    el.setSelectionRange(el.value.length, el.value.length)
-  }, [editing])
+    if (selectOnEdit) el.select()
+    else el.setSelectionRange(el.value.length, el.value.length)
+  }, [editing, selectOnEdit])
+
+  React.useEffect(() => {
+    if (autoEdit) onAutoEditDone?.()
+    // Only on mount: autoEdit seeds the initial editing state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const start = () => {
     cancelledRef.current = false
@@ -249,6 +264,47 @@ export function ArtifactTable({
     [scheduleSave],
   )
 
+  // The cell / header to open for typing right after an insert.
+  const [autoEdit, setAutoEdit] = React.useState<string | null>(null)
+  const clearAutoEdit = React.useCallback(() => setAutoEdit(null), [])
+
+  const insertRow = React.useCallback(
+    (anchorId: TableRow["id"] | null, position: "above" | "below") => {
+      const row: TableRow = { id: `row_${crypto.randomUUID()}` }
+      columnsRef.current.forEach((col) => {
+        row[col.key] = { value: "" }
+      })
+      const current = rowsRef.current
+      const anchor = anchorId === null ? -1 : current.findIndex((r) => r.id === anchorId)
+      const index =
+        anchor === -1 ? current.length : position === "above" ? anchor : anchor + 1
+      commitRows([...current.slice(0, index), row, ...current.slice(index)])
+      const firstColumn = columnsRef.current[0]
+      if (firstColumn) setAutoEdit(`${row.id}:${firstColumn.key}`)
+    },
+    [commitRows],
+  )
+
+  const insertColumn = React.useCallback(
+    (anchorKey: string, side: "left" | "right") => {
+      const column: TableColumn = {
+        key: `col_${crypto.randomUUID()}`,
+        label: "New column",
+        width: "auto",
+        type: "text",
+      }
+      const current = columnsRef.current
+      const anchor = current.findIndex((col) => col.key === anchorKey)
+      const index = anchor === -1 ? current.length : side === "left" ? anchor : anchor + 1
+      const nextColumns = [...current.slice(0, index), column, ...current.slice(index)]
+      columnsRef.current = nextColumns
+      setColumns(nextColumns)
+      commitRows(rowsRef.current.map((r) => ({ ...r, [column.key]: { value: "" } })))
+      setAutoEdit(`header:${column.key}`)
+    },
+    [commitRows],
+  )
+
   const renderCell = React.useCallback(
     (row: TableRow, column: TableColumn, cell: unknown) => (
       <EditableText
@@ -256,11 +312,13 @@ export function ArtifactTable({
         onCommit={(value) => updateCell(row.id, column.key, value)}
         label={`${column.label} cell`}
         multiline
+        autoEdit={autoEdit === `${row.id}:${column.key}`}
+        onAutoEditDone={clearAutoEdit}
         displayClassName="block min-w-24 max-w-md whitespace-pre-wrap text-sm leading-relaxed text-[#3f3f46]"
         inputClassName="max-w-md text-sm leading-relaxed"
       />
     ),
-    [updateCell],
+    [updateCell, autoEdit, clearAutoEdit],
   )
 
   const renderColumnLabel = React.useCallback(
@@ -270,11 +328,14 @@ export function ArtifactTable({
         onCommit={(label) => renameColumn(column.key, label || column.label)}
         label={`${column.label} column name`}
         placeholder="Untitled"
+        autoEdit={autoEdit === `header:${column.key}`}
+        onAutoEditDone={clearAutoEdit}
+        selectOnEdit
         displayClassName="text-[11px] font-semibold tracking-[0.08em] text-[#a1a1aa] uppercase whitespace-nowrap"
         inputClassName="min-w-28 text-xs font-semibold text-[#52525b]"
       />
     ),
-    [renameColumn],
+    [renameColumn, autoEdit, clearAutoEdit],
   )
 
   return (
@@ -287,6 +348,8 @@ export function ArtifactTable({
       tableColumns={columns}
       renderCell={renderCell}
       renderColumnLabel={renderColumnLabel}
+      onInsertRow={insertRow}
+      onInsertColumn={insertColumn}
       // The CRM variant has no pager, so show every row.
       pageProps={{ page: 1, limit: Math.max(rows.length, 1) }}
       dataCallback={commitRows}
