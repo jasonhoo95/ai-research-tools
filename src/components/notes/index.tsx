@@ -446,6 +446,10 @@ function clampLayoutToColumns(
     })
 }
 
+/** Sticky-note colours; `shadeClass` on an item can override these vars. */
+export const NOTE_DEFAULT_SHADE =
+    "[--note-bg:#d4eff1] [--note-fold-bg:#9fd3d9] [--note-ink:#1f3136] [--note-fold:26px] dark:[--note-bg:#1d3a3e] dark:[--note-fold-bg:#2c585e] dark:[--note-ink:#e3f4f5]"
+
 /**
  * Individual pin card.
  */
@@ -515,19 +519,27 @@ function PinCard({
     }
 
     return (
+        // Sticky note with a folded top-right corner. The shadow is a
+        // drop-shadow filter on this wrapper because the card itself is
+        // clipped (box-shadow would be clipped with it).
         <div
             className={cn(
-                "relative flex h-full min-h-0",
-                "flex-col rounded-2xl border p-4",
-                "shadow-sm transition-shadow",
-                item.shadeClass ??
-                "bg-primary/10",
-                "hover:shadow-md",
+                "group/pin relative h-full min-h-0",
+                "[filter:drop-shadow(0_1px_1.5px_rgb(0_0_0/0.10))_drop-shadow(0_4px_10px_rgb(0_0_0/0.05))]",
+                "transition-[filter] hover:[filter:drop-shadow(0_2px_3px_rgb(0_0_0/0.12))_drop-shadow(0_10px_20px_rgb(0_0_0/0.08))]",
+                item.shadeClass ?? NOTE_DEFAULT_SHADE,
                 item.className,
             )}
         >
-            {/* Header */}
-            <div className="flex shrink-0 items-start justify-between gap-2">
+            <div
+                className={cn(
+                    "flex h-full min-h-0 flex-col rounded-lg p-4",
+                    "bg-(--note-bg) text-(--note-ink)",
+                    "[clip-path:polygon(0_0,calc(100%-var(--note-fold))_0,100%_var(--note-fold),100%_100%,0_100%)]",
+                )}
+            >
+            {/* Header — keep clear of the folded corner */}
+            <div className="flex shrink-0 items-start pr-4">
                 <span
                     ref={labelRef}
                     contentEditable={isEditing}
@@ -544,31 +556,12 @@ function PinCard({
                         "min-w-0 flex-1",
                         "whitespace-pre-wrap",
                         "break-words",
-                        "text-2xl font-medium",
-                        "text-foreground/70",
+                        "text-base font-semibold leading-snug",
                         "outline-none",
                         !isEditing &&
                         "cursor-text",
                     )}
                 />
-
-                {/* Drag handle — do not stopPropagation here; RGL needs the mousedown */}
-                <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Drag ${item.label ?? item.id}`}
-                    className={cn(
-                        "drag-handle",
-                        "cursor-grab touch-none select-none",
-                        "rounded-md p-1",
-                        "text-muted-foreground",
-                        "hover:bg-background/60",
-                        "hover:text-foreground",
-                        "active:cursor-grabbing",
-                    )}
-                >
-                    <GripVertical className="pointer-events-none size-4" />
-                </div>
             </div>
 
             {/* Slate editor */}
@@ -603,13 +596,51 @@ function PinCard({
                         "px-0 py-1",
                         "min-h-[72px]",
                         "outline-none",
-                        "text-sm",
-                        "text-foreground/80",
+                        "text-sm leading-relaxed",
+                        "text-(--note-ink)/85",
+                        "[&_:is(h1,h2,h3,strong,a)]:text-(--note-ink)",
                         "[&_h1]:text-lg",
                         "[&_h2]:text-base",
+                        // Bullets as hollow circles, like a checklist.
+                        "[&_ul]:list-none [&_ul]:pl-0",
+                        "[&_ul>li]:relative [&_ul>li]:my-1 [&_ul>li]:pl-6",
+                        "[&_ul>li]:before:absolute [&_ul>li]:before:left-0 [&_ul>li]:before:top-[0.3em]",
+                        "[&_ul>li]:before:size-3.5 [&_ul>li]:before:rounded-full [&_ul>li]:before:content-['']",
+                        "[&_ul>li]:before:border-[1.5px] [&_ul>li]:before:border-(--note-ink)/40",
                     )}
                 />
             </div>
+            </div>
+
+            {/* Drag handle, tucked under the fold so it doesn't take title
+                space. Do not stopPropagation here; RGL needs the mousedown. */}
+            <div
+                role="button"
+                tabIndex={0}
+                aria-label={`Drag ${item.label ?? item.id}`}
+                className={cn(
+                    "drag-handle absolute right-1 top-[calc(var(--note-fold)+2px)] z-10",
+                    "cursor-grab touch-none select-none",
+                    "rounded-md p-1 text-(--note-ink)",
+                    "opacity-0 transition-opacity group-hover/pin:opacity-50 focus-visible:opacity-100",
+                    "hover:!opacity-100 hover:bg-black/5",
+                    "active:cursor-grabbing",
+                )}
+            >
+                <GripVertical className="pointer-events-none size-4" />
+            </div>
+
+            {/* Folded corner */}
+            <div
+                aria-hidden
+                className={cn(
+                    "pointer-events-none absolute right-0 top-0",
+                    "size-(--note-fold) rounded-bl-md",
+                    "bg-[linear-gradient(225deg,transparent_50%,var(--note-fold-bg)_50%)]",
+                    "shadow-[-1px_1px_2px_rgb(0_0_0/0.08)]",
+                    "[clip-path:polygon(0_0,100%_100%,0_100%)]",
+                )}
+            />
         </div>
     )
 }
