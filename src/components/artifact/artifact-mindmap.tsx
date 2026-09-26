@@ -223,8 +223,9 @@ function TopicNodeView({ id, data, selected }: NodeProps<TopicNode>) {
   const isRoot = rootIds.has(id)
   const editing = editingId === id
 
+  // `.valid` marks the dot a dragged line will snap to.
   const handleClass =
-    "!size-3 !border-2 !border-[#f97316] !bg-white transition-transform hover:!scale-125"
+    "!size-3 !border-2 !border-[#f97316] !bg-white transition-transform hover:!scale-125 [&.valid]:!scale-150 [&.valid]:!bg-[#f97316]"
 
   return (
     <div
@@ -241,7 +242,16 @@ function TopicNodeView({ id, data, selected }: NodeProps<TopicNode>) {
         setEditingId(id)
       }}
     >
-      <Handle type="target" position={Position.Left} className={handleClass} />
+      {/* Incoming (from the parent): only receives, never starts a line. */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        isConnectableStart={false}
+        // React Flow turns pointer events off on a dot that can't start a
+        // line, so a press would fall through and drag the node. Catch it
+        // (the handle is nodrag) so pressing this dot does nothing.
+        className={cn(handleClass, "!pointer-events-auto !cursor-default")}
+      />
 
       {editing ? (
         <NodeTitleInput
@@ -286,7 +296,13 @@ function TopicNodeView({ id, data, selected }: NodeProps<TopicNode>) {
         </div>
       ) : null}
 
-      <Handle type="source" position={Position.Right} className={handleClass} />
+      {/* Outgoing (to children): drag from here to a child's left dot. */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        isConnectableEnd={false}
+        className={cn(handleClass, "!cursor-crosshair")}
+      />
     </div>
   )
 }
@@ -738,17 +754,42 @@ function MindmapCanvas({
     [deleteElements, openId],
   )
 
+  // Parent → child only: no self-links, no duplicates, and no loops (a node
+  // can't become the parent of one of its own ancestors).
+  const canLink = React.useCallback(
+    (source: string, target: string) => {
+      if (source === target) return false
+      if (edges.some((e) => e.source === source && e.target === target)) return false
+      const children = new Map<string, string[]>()
+      for (const e of edges) children.set(e.source, [...(children.get(e.source) ?? []), e.target])
+      const stack = [target]
+      const seen = new Set<string>()
+      while (stack.length) {
+        const id = stack.pop()!
+        if (id === source) return false
+        if (seen.has(id)) continue
+        seen.add(id)
+        stack.push(...(children.get(id) ?? []))
+      }
+      return true
+    },
+    [edges],
+  )
+
+  const isValidConnection = React.useCallback(
+    (connection: Connection | RelationEdge) => canLink(connection.source, connection.target),
+    [canLink],
+  )
+
   const onConnect = React.useCallback(
     (connection: Connection) => {
       const { source, target } = connection
-      if (source === target) return
+      if (!canLink(source, target)) return
       setEdges((current) =>
-        current.some((e) => e.source === source && e.target === target)
-          ? current
-          : addEdge(relationEdge(`edge_${crypto.randomUUID()}`, source, target), current),
+        addEdge(relationEdge(`edge_${crypto.randomUUID()}`, source, target), current),
       )
     },
-    [setEdges],
+    [canLink, setEdges],
   )
 
   // Dropping a new line anywhere on a node connects to it, not only on its dot.
@@ -760,12 +801,11 @@ function MindmapCanvas({
         .elementFromPoint(point.clientX, point.clientY)
         ?.closest(".react-flow__node")
         ?.getAttribute("data-id")
-      if (!targetId || targetId === state.fromNode.id) return
-      // Dragged backwards from an incoming dot: the dropped-on node comes first.
-      const backwards = state.fromHandle?.type === "target"
+      if (!targetId || state.fromHandle?.type !== "source") return
+      // The dropped-on node becomes the child.
       onConnect({
-        source: backwards ? targetId : state.fromNode.id,
-        target: backwards ? state.fromNode.id : targetId,
+        source: state.fromNode.id,
+        target: targetId,
         sourceHandle: null,
         targetHandle: null,
       })
@@ -893,7 +933,10 @@ function MindmapCanvas({
             setOpenId(node.id)
             setSheetOpen(true)
           }}
-          connectionMode={ConnectionMode.Loose}
+          // Strict: lines run from a right (outgoing) dot to a left
+          // (incoming) dot only.
+          connectionMode={ConnectionMode.Strict}
+          isValidConnection={isValidConnection}
           connectionLineStyle={{ stroke: ACCENT, strokeWidth: 2 }}
           deleteKeyCode={["Backspace", "Delete"]}
           onInit={showStart}
@@ -935,7 +978,7 @@ function MindmapCanvas({
             position="top-right"
             className="hidden rounded-lg border border-(--border) bg-(--card)/90 px-3 py-1.5 text-xs text-(--muted-foreground) shadow-sm md:block"
           >
-            Click a node for details · drag a dot to connect · select a line to delete it
+            Click a node for details · drag from a right dot to a child · select a line to delete it
           </Panel>
         </ReactFlow>
       </div>
