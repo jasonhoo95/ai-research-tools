@@ -25,14 +25,15 @@ export const chatClient = {
     return data
   },
 
-  async askWithFile(args: {
-    file: File
+  /** Ask about one or more files, e.g. to compare or extract from them. */
+  async askWithFiles(args: {
+    files: File[]
     message: string
     system?: string
     history?: ChatHistoryItem[]
   }): Promise<FileChatResponse> {
     const form = new FormData()
-    form.append("file", args.file)
+    for (const file of args.files) form.append("files", file)
     form.append("message", args.message)
     if (args.system) form.append("system", args.system)
     if (args.history) form.append("history", JSON.stringify(args.history))

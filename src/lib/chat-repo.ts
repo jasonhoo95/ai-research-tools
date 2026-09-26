@@ -6,6 +6,7 @@ import type {
 	Artifact,
 	CitationSource,
 	GeneratedArtifact,
+	MessageAttachment,
 	SearchProvider,
 } from "@/lib/chat-types";
 
@@ -31,7 +32,9 @@ export interface ChatRow {
 export interface MessageContent {
 	role: "user" | "assistant";
 	text: string;
+	/** Older messages: a single file. */
 	attachment?: { name: string; kind: string };
+	attachments?: MessageAttachment[];
 	artifact?: {
 		id: string;
 		kind: GeneratedArtifact["artifact"]["kind"];

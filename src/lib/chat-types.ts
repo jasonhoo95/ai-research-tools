@@ -228,16 +228,24 @@ export interface ChatResponse {
 	searchProvider?: SearchProvider;
 }
 
+/** A file sent with a chat message. */
+export interface MessageAttachment {
+	name: string;
+	/** MIME type (older messages may hold another label). */
+	kind: string;
+	size?: number;
+}
+
+export interface UploadedFileSummary {
+	originalName: string;
+	mimeType: string;
+	sizeBytes: number;
+	kind: "pdf" | "docx" | "image" | "video" | "text";
+}
+
 export interface FileChatResponse extends ChatResponse {
-	file: {
-		originalName: string;
-		mimeType: string;
-		sizeBytes: number;
-		kind:
-			| "pdf"
-			| "docx"
-			| "image"
-			| "video"
-			| "text";
-	};
+	/** First file (kept for older callers). */
+	file: UploadedFileSummary;
+	/** Every file sent, in order. */
+	files?: UploadedFileSummary[];
 }

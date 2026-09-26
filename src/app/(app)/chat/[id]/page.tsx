@@ -72,6 +72,7 @@ function contentToBubble(row: {
     role: row.content.role,
     content: row.content.text,
     attachment: row.content.attachment,
+    attachments: row.content.attachments,
     artifact: row.content.artifact,
     sources: row.content.sources,
     searchProvider: row.content.searchProvider,
@@ -85,10 +86,19 @@ const HIGHLIGHT_MS = 2000
 
 const MAX_HISTORY_MESSAGES = 5
 function toHistory(messages: ChatBubbleMessage[]): ChatHistoryItem[] {
-  return messages.slice(-MAX_HISTORY_MESSAGES).map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    content: m.content,
-  }))
+  return messages
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((m): ChatHistoryItem => {
+      // Files aren't re-sent, but naming them keeps follow-ups in context.
+      // It also keeps a files-only message from being an empty turn, which
+      // the backend rejects.
+      const files = (m.attachments ?? (m.attachment ? [m.attachment] : [])).map((a) => a.name)
+      const content = [m.content.trim(), files.length ? `[Attached files: ${files.join(", ")}]` : ""]
+        .filter(Boolean)
+        .join("\n")
+      return { role: m.role === "assistant" ? "model" : "user", content }
+    })
+    .filter((item) => item.content)
 }
 
 export default function ChatConversationPage() {
@@ -411,10 +421,10 @@ export default function ChatConversationPage() {
     if (hasMoreAfter) setShowJumpToLatest(true)
   }, [hasMoreAfter])
 
-  const send = async (text: string, file: File | null) => {
+  const send = async (text: string, files: File[]) => {
     if (!chatId) return
     const value = text.trim()
-    if ((!value && !file) || pending) return
+    if ((!value && !files.length) || pending) return
 
     setError(null)
 
@@ -432,8 +442,11 @@ export default function ChatConversationPage() {
 
     const userContent: MessageContent = {
       role: "user",
-      text: value || (file ? "(sent an attachment)" : ""),
-      attachment: file ? { name: file.name, kind: file.type || "file" } : undefined,
+      // Files alone are fine: the bubble shows just the file cards.
+      text: value,
+      attachments: files.length
+        ? files.map((f) => ({ name: f.name, kind: f.type || "file", size: f.size }))
+        : undefined,
     }
 
     let userMsgId = crypto.randomUUID()
@@ -441,7 +454,7 @@ export default function ChatConversationPage() {
       id: userMsgId,
       role: "user",
       content: userContent.text,
-      attachment: userContent.attachment,
+      attachments: userContent.attachments,
       createdAt: new Date().toISOString(),
     }
     setMessages((prev) => [...prev, optimisticUser])
@@ -462,11 +475,15 @@ export default function ChatConversationPage() {
       const history = toHistory(base)
       const questionForGemini =
         value ||
-        (file ? "Please summarize this file and highlight its key points." : "")
+        (files.length > 1
+          ? "Summarize each of these files, then compare them: key points, similarities and differences."
+          : files.length === 1
+            ? "Please summarize this file and highlight its key points."
+            : "")
 
-      const data = file
-        ? await chatClient.askWithFile({
-          file,
+      const data = files.length
+        ? await chatClient.askWithFiles({
+          files,
           message: questionForGemini,
           history,
         })

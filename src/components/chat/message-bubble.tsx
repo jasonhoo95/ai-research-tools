@@ -8,8 +8,10 @@ import { cn } from "@/lib/utils"
 import type {
   CitationSource,
   GeneratedArtifact,
+  MessageAttachment,
   SearchProvider,
 } from "@/lib/chat-types"
+import { MessageAttachments } from "@/components/chat/attachments"
 import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-labels"
 import { Citations, linkifyCitations } from "@/components/chat/citations"
 
@@ -19,7 +21,9 @@ export interface ChatBubbleMessage {
   id: string
   role: MessageRole
   content: string
+  /** Older messages: a single file. */
   attachment?: { name: string; kind: string }
+  attachments?: MessageAttachment[]
   artifact?: {
     id: string
     kind: GeneratedArtifact["artifact"]["kind"]
@@ -75,6 +79,10 @@ export function MessageBubble({
   chatbotId?: string
 }) {
   const isUser = message.role === "user"
+  const attachments =
+    message.attachments ?? (message.attachment ? [message.attachment] : [])
+  // A message can be just files, with no text to show in a bubble.
+  const showBubble = typing || message.content.trim().length > 0 || Boolean(message.artifact)
   const showAddNotes =
     noteState && !typing && message.content.trim().length > 0
 
@@ -87,118 +95,122 @@ export function MessageBubble({
           {isUser ? "U" : "AI"}
         </AvatarFallback>
       </Avatar>
+      {/* Files sit above the bubble, like ChatGPT. */}
       <div
         className={cn(
-          "relative max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-6",
-          isUser
-            ? "bg-primary text-primary-foreground whitespace-pre-wrap"
-            : "bg-muted text-foreground",
+          "flex max-w-[75%] min-w-0 flex-col gap-2",
+          isUser ? "items-end" : "items-start",
         )}
       >
-        {pinState && !isUser && !typing ? (
-          <button
-            type="button"
-            onClick={pinState.onToggle}
-            disabled={pinState.pending}
-            aria-pressed={pinState.pinned}
-            aria-label={pinState.pinned ? "Unpin message" : "Pin message"}
-            title={pinState.pinned ? "Unpin" : "Pin"}
+        {attachments.length > 0 && !typing ? (
+          <MessageAttachments
+            attachments={attachments}
+            className={cn(isUser && "justify-end")}
+          />
+        ) : null}
+        {showBubble ? (
+          <div
             className={cn(
-              // Just outside the bubble's top-right corner, like ChatGPT's
-              // hover actions; stays visible once pinned.
-              "absolute -right-9 top-0 flex size-7 items-center justify-center rounded-lg transition-[opacity,color,background-color] hover:bg-muted focus-visible:opacity-100 disabled:opacity-50",
-              pinState.pinned
-                ? "text-[#f97316] opacity-100"
-                : "text-muted-foreground opacity-0 hover:text-foreground group-hover/message:opacity-100",
+              "relative max-w-full rounded-2xl px-4 py-2.5 text-sm leading-6",
+              isUser
+                ? "bg-primary text-primary-foreground whitespace-pre-wrap"
+                : "bg-muted text-foreground",
             )}
           >
-            <Pin className={cn("size-3.5 transition-transform", pinState.pinned && "rotate-45 fill-current")} />
-          </button>
-        ) : null}
-        {typing ? (
-          <TypingDots />
-        ) : (
-          <>
-            {message.attachment && (
-              <div
-                className={cn(
-                  "mb-2 rounded-md px-2 py-1 text-xs",
-                  isUser
-                    ? "bg-primary-foreground/15 text-primary-foreground"
-                    : "bg-background/50 text-muted-foreground",
-                )}
-              >
-                📎 {message.attachment.name}
-              </div>
-            )}
-            {isUser ? (
-              message.content
-            ) : (
-              <Markdown>
-                {message.sources?.length
-                  ? linkifyCitations(message.content, message.sources)
-                  : message.content}
-              </Markdown>
-            )}
-            {message.artifact && (
-              <ArtifactCard
-                artifact={message.artifact}
-                saveState={artifactSaveState}
-                chatbotId={chatbotId}
-              />
-            )}
-            {!isUser && message.sources?.length ? (
-              <Citations
-                sources={message.sources}
-                provider={message.searchProvider}
-              />
-            ) : null}
-            {showAddNotes && !isUser && !message.artifact && (
+            {pinState && !isUser && !typing ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (noteState.saving) return
-                  if (noteState.saved) noteState.onRemove()
-                  else noteState.onAdd()
-                }}
-                disabled={noteState.saving}
-                aria-pressed={noteState.saved}
-                aria-label={
-                  noteState.saved
-                    ? "Remove message from notes"
-                    : "Add message to notes"
-                }
-                title={
-                  noteState.saved
-                    ? "In notes — click to remove"
-                    : noteState.saving
-                      ? "Adding…"
-                      : "Add to notes"
-                }
+                onClick={pinState.onToggle}
+                disabled={pinState.pending}
+                aria-pressed={pinState.pinned}
+                aria-label={pinState.pinned ? "Unpin message" : "Pin message"}
+                title={pinState.pinned ? "Unpin" : "Pin"}
                 className={cn(
-                  "absolute bottom-2 right-2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-                  isUser
-                    ? "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                    : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground",
-                  noteState.saved &&
-                  (isUser
-                    ? "border-primary-foreground/40 bg-primary-foreground/20"
-                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"),
-                  noteState.saving && "opacity-60",
+                  // Just outside the bubble's top-right corner, like ChatGPT's
+                  // hover actions; stays visible once pinned.
+                  "absolute -right-9 top-0 flex size-7 items-center justify-center rounded-lg transition-[opacity,color,background-color] hover:bg-muted focus-visible:opacity-100 disabled:opacity-50",
+                  pinState.pinned
+                    ? "text-[#f97316] opacity-100"
+                    : "text-muted-foreground opacity-0 hover:text-foreground group-hover/message:opacity-100",
                 )}
               >
-                <StickyNote className="size-3" />
-
-                {noteState.saved
-                  ? "In notes"
-                  : noteState.saving
-                    ? "Adding…"
-                    : "Add notes"}
-
+                <Pin className={cn("size-3.5 transition-transform", pinState.pinned && "rotate-45 fill-current")} />
               </button>
+            ) : null}
+            {typing ? (
+              <TypingDots />
+            ) : (
+              <>
+                {isUser ? (
+                  message.content
+                ) : (
+                  <Markdown>
+                    {message.sources?.length
+                      ? linkifyCitations(message.content, message.sources)
+                      : message.content}
+                  </Markdown>
+                )}
+                {message.artifact && (
+                  <ArtifactCard
+                    artifact={message.artifact}
+                    saveState={artifactSaveState}
+                    chatbotId={chatbotId}
+                  />
+                )}
+                {!isUser && message.sources?.length ? (
+                  <Citations
+                    sources={message.sources}
+                    provider={message.searchProvider}
+                  />
+                ) : null}
+                {showAddNotes && !isUser && !message.artifact && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (noteState.saving) return
+                      if (noteState.saved) noteState.onRemove()
+                      else noteState.onAdd()
+                    }}
+                    disabled={noteState.saving}
+                    aria-pressed={noteState.saved}
+                    aria-label={
+                      noteState.saved
+                        ? "Remove message from notes"
+                        : "Add message to notes"
+                    }
+                    title={
+                      noteState.saved
+                        ? "In notes — click to remove"
+                        : noteState.saving
+                          ? "Adding…"
+                          : "Add to notes"
+                    }
+                    className={cn(
+                      "absolute bottom-2 right-2 flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
+                      isUser
+                        ? "border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                        : "border-border/60 bg-background/80 text-muted-foreground hover:bg-background hover:text-foreground",
+                      noteState.saved &&
+                      (isUser
+                        ? "border-primary-foreground/40 bg-primary-foreground/20"
+                        : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"),
+                      noteState.saving && "opacity-60",
+                    )}
+                  >
+                    <StickyNote className="size-3" />
+
+                    {noteState.saved
+                      ? "In notes"
+                      : noteState.saving
+                        ? "Adding…"
+                        : "Add notes"}
+
+                  </button>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        ) : null}
       </div>
     </div>
   )
