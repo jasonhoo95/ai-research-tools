@@ -35,6 +35,53 @@ function loadBytes(chatId: string, fileId: string): Promise<ArrayBuffer> {
   return bytes
 }
 
+/** Zoom steps; 1 fits PDF pages to the viewer's width. */
+export const ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3]
+
+/** The next zoom step in or out from `zoom`. */
+export function stepZoom(zoom: number, direction: 1 | -1) {
+  const next =
+    direction > 0
+      ? ZOOM_LEVELS.find((level) => level > zoom + 0.001)
+      : ZOOM_LEVELS.findLast((level) => level < zoom - 0.001)
+  return next ?? zoom
+}
+
+/**
+ * Keep the same part of the document in view when its size changes
+ * (zooming, or the viewer resizing), instead of jumping.
+ */
+function useKeepScrollPosition(scrollEl: HTMLElement | null, size: number) {
+  // Where the middle of the view was, as fractions of the content size.
+  const anchor = React.useRef<{ x: number; y: number } | null>(null)
+
+  React.useEffect(() => {
+    if (!scrollEl) return
+    const remember = () => {
+      anchor.current = {
+        x: (scrollEl.scrollLeft + scrollEl.clientWidth / 2) / scrollEl.scrollWidth,
+        y: (scrollEl.scrollTop + scrollEl.clientHeight / 2) / scrollEl.scrollHeight,
+      }
+    }
+    remember()
+    scrollEl.addEventListener("scroll", remember, { passive: true })
+    return () => scrollEl.removeEventListener("scroll", remember)
+  }, [scrollEl])
+
+  const lastSize = React.useRef(size)
+  React.useLayoutEffect(() => {
+    const at = anchor.current
+    const resized = Boolean(lastSize.current) && lastSize.current !== size
+    lastSize.current = size
+    // Not on the first real size (e.g. a PDF's first render): stay at the top.
+    if (!scrollEl || !at || !resized) return
+    scrollEl.scrollTo({
+      left: at.x * scrollEl.scrollWidth - scrollEl.clientWidth / 2,
+      top: at.y * scrollEl.scrollHeight - scrollEl.clientHeight / 2,
+    })
+  }, [scrollEl, size])
+}
+
 /** What every view needs to show and create highlights. */
 type HighlightProps = {
   highlights: DocHighlight[]
@@ -150,7 +197,8 @@ function PdfView({
   focus,
   onCreateHighlight,
   onOpenHighlight,
-}: HighlightProps & { data: ArrayBuffer }) {
+  zoom,
+}: HighlightProps & { data: ArrayBuffer; zoom: number }) {
   // In state: pages observe their visibility within it.
   const [scrollRoot, setScrollRoot] = React.useState<HTMLDivElement | null>(null)
   const [pdfjs, setPdfjs] = React.useState<Pdfjs | null>(null)
@@ -197,8 +245,11 @@ function PdfView({
     () => Math.max(1, ...pages.map((p) => p.getViewport({ scale: 1 }).width)),
     [pages],
   )
-  // Round so tiny width changes don't re-render every page.
-  const scale = width ? Math.round(Math.min(2.5, (width - 48) / maxPageWidth) * 100) / 100 : 0
+  // Fit to width, then zoom. Round so tiny width changes don't re-render
+  // every page.
+  const fit = Math.min(2.5, (width - 48) / maxPageWidth)
+  const scale = width ? Math.max(0.1, Math.round(fit * zoom * 100) / 100) : 0
+  useKeepScrollPosition(scrollRoot, scale)
 
   const onTextLayer = React.useCallback((pageNumber: number, layer: HTMLElement | null) => {
     setLayers((prev) => {
@@ -240,7 +291,9 @@ function PdfView({
       ) : !pdfjs || !pages.length || !scale ? (
         <ViewerMessage>Opening PDF…</ViewerMessage>
       ) : (
-        <div className="relative flex flex-col items-center gap-4 px-6 py-6">
+        // w-max: zoomed pages wider than the viewer scroll sideways instead
+        // of being cut off on the left.
+        <div className="relative flex w-max min-w-full flex-col items-center gap-4 px-6 py-6">
           {pages.map((page, i) => (
             <PdfPage
               key={i}
@@ -273,7 +326,14 @@ function PdfView({
 // Word (.docx) and text
 // -----------------------------------------------------------------------------
 
-function DocxView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuffer }) {
+// Word and text documents reflow: zoom scales their text and page width.
+const DOC_WIDTH = 768
+
+function DocxView({
+  data,
+  zoom,
+  ...highlightProps
+}: HighlightProps & { data: ArrayBuffer; zoom: number }) {
   const [scrollEl, setScrollEl] = React.useState<HTMLDivElement | null>(null)
   const [content, setContent] = React.useState<HTMLElement | null>(null)
   const [html, setHtml] = React.useState<string | null>(null)
@@ -294,6 +354,7 @@ function DocxView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuf
       cancelled = true
     }
   }, [data])
+  useKeepScrollPosition(scrollEl, zoom)
 
   return (
     <div ref={setScrollEl} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
@@ -302,10 +363,11 @@ function DocxView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuf
       ) : html === null ? (
         <ViewerMessage>Opening document…</ViewerMessage>
       ) : (
-        <div className="relative mx-auto max-w-3xl">
+        <div className="relative mx-auto" style={{ maxWidth: DOC_WIDTH * zoom }}>
           <article
             ref={setContent}
             className="docx-content bg-white px-12 py-10 shadow-sm ring-1 ring-black/5"
+            style={{ fontSize: 15 * zoom }}
             // mammoth escapes the document's text; its HTML is the document itself.
             dangerouslySetInnerHTML={{ __html: html }}
           />
@@ -316,16 +378,22 @@ function DocxView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuf
   )
 }
 
-function TextView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuffer }) {
+function TextView({
+  data,
+  zoom,
+  ...highlightProps
+}: HighlightProps & { data: ArrayBuffer; zoom: number }) {
   const [scrollEl, setScrollEl] = React.useState<HTMLDivElement | null>(null)
   const [content, setContent] = React.useState<HTMLPreElement | null>(null)
   const text = React.useMemo(() => new TextDecoder().decode(data), [data])
+  useKeepScrollPosition(scrollEl, zoom)
   return (
     <div ref={setScrollEl} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
-      <div className="relative mx-auto max-w-3xl">
+      <div className="relative mx-auto" style={{ maxWidth: DOC_WIDTH * zoom }}>
         <pre
           ref={setContent}
-          className="bg-white px-10 py-8 font-mono text-[13px] leading-6 whitespace-pre-wrap text-[#27272a] shadow-sm ring-1 ring-black/5"
+          className="bg-white px-10 py-8 font-mono leading-[1.85] whitespace-pre-wrap text-[#27272a] shadow-sm ring-1 ring-black/5"
+          style={{ fontSize: 13 * zoom }}
         >
           {text}
         </pre>
@@ -399,10 +467,13 @@ function ViewerMessage({ children, error }: { children: React.ReactNode; error?:
 export function DocumentViewer({
   chatId,
   file,
+  zoom = 1,
   ...highlightProps
 }: HighlightProps & {
   chatId: string
   file: ChatFileItem
+  /** 1 = fit to width (PDF) or normal size (Word, text). */
+  zoom?: number
 }) {
   const [state, setState] = React.useState<
     { fileId: string; data: ArrayBuffer } | { fileId: string; error: string } | null
@@ -433,7 +504,7 @@ export function DocumentViewer({
   if (!state || state.fileId !== file.id) return <ViewerMessage>Loading {file.name}…</ViewerMessage>
   if ("error" in state) return <ViewerMessage error>Couldn&apos;t load {file.name}: {state.error}</ViewerMessage>
 
-  const props = { data: state.data, ...highlightProps }
+  const props = { data: state.data, zoom, ...highlightProps }
   switch (file.kind) {
     case "pdf":
       return <PdfView key={file.id} {...props} />

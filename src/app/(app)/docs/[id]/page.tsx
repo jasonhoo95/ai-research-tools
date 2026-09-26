@@ -3,11 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { Highlighter, PanelLeft, Upload, X } from "lucide-react"
+import { Highlighter, PanelLeft, Upload, X, ZoomIn, ZoomOut } from "lucide-react"
 
 import { ChatThread, type ChatThreadHandle } from "@/components/chat/chat-thread"
 import type { ChatArtifactItem } from "@/components/chat/artifacts-panel"
-import { DocumentViewer } from "@/components/docs/document-viewer"
+import { DocumentViewer, ZOOM_LEVELS, stepZoom } from "@/components/docs/document-viewer"
 import {
   DOCUMENT_ACCEPT,
   DocumentsPanel,
@@ -75,6 +75,7 @@ export default function DocsWorkspacePage() {
   const [activeFileId, setActiveFileId] = React.useState<string | null>(null)
   const [scope, setScope] = React.useState<"all" | "current">("all")
   const [dragging, setDragging] = React.useState(false)
+  const [zoom, setZoom] = React.useState(1)
 
   // Highlights live in the chat's artifacts, which the thread loads and owns.
   const threadRef = React.useRef<ChatThreadHandle>(null)
@@ -399,6 +400,38 @@ export default function DocsWorkspacePage() {
                 : "Select text to insert a highlight"}
             </p>
           ) : null}
+          {activeFile?.previewable && activeFile.kind !== "image" && activeFile.kind !== "video" ? (
+            <div className="flex shrink-0 items-center rounded-lg border bg-background">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => stepZoom(z, -1))}
+                disabled={zoom <= ZOOM_LEVELS[0]}
+                aria-label="Zoom out"
+                title="Zoom out"
+                className="flex size-7 items-center justify-center rounded-l-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+              >
+                <ZoomOut className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                title={activeFile.kind === "pdf" ? "Fit to width" : "Reset zoom"}
+                className="h-7 min-w-12 border-x px-1.5 text-xs font-medium text-muted-foreground tabular-nums transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => stepZoom(z, 1))}
+                disabled={zoom >= ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                aria-label="Zoom in"
+                title="Zoom in"
+                className="flex size-7 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+              >
+                <ZoomIn className="size-4" />
+              </button>
+            </div>
+          ) : null}
         </header>
         {notice ? (
           <div className="flex items-start justify-between gap-3 border-b bg-amber-50 px-4 py-2 text-sm text-amber-800">
@@ -413,6 +446,7 @@ export default function DocsWorkspacePage() {
             <DocumentViewer
               chatId={chatId}
               file={activeFile}
+              zoom={zoom}
               highlights={viewerHighlights}
               focus={focus}
               onCreateHighlight={(highlight) => {
