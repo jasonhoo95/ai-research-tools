@@ -10,7 +10,7 @@ import {
   Table2,
 } from "lucide-react"
 
-import { chatRepo, type ChatRow } from "@/lib/chat-repo"
+import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
 
 function formatRelative(iso: string) {
@@ -55,7 +55,7 @@ export default function DashboardPage() {
   useEffect(() => {
     chatRepo
       .listChats()
-      .then(setChats)
+      .then((rows) => setChats(rows.filter(isPlainChat)))
       .catch(() => setChats([]))
   }, [])
 

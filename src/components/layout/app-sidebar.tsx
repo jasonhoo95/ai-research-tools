@@ -7,6 +7,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  FileSearch,
   Home,
   Inbox,
   ListTodo,
@@ -27,7 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { fetchCurrentUser, logout } from "@/lib/auth-client"
 import type { AuthUser } from "@/lib/auth-session"
-import { chatRepo, type ChatRow } from "@/lib/chat-repo"
+import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
 
 function initials(user: AuthUser | null) {
@@ -40,6 +41,7 @@ const mainNav = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/details", label: "Task", icon: ListTodo },
   { href: "/chat", label: "Inbox", icon: Inbox },
+  { href: "/docs", label: "Docs", icon: FileSearch },
   { href: "/dashboard", label: "Calendar", icon: Calendar },
 ]
 
@@ -59,7 +61,7 @@ export function AppSidebar() {
   useEffect(() => {
     chatRepo
       .listChats()
-      .then(setRecentChats)
+      .then((rows) => setRecentChats(rows.filter(isPlainChat)))
       .catch(() => setRecentChats([]))
   }, [pathname])
 
@@ -122,7 +124,9 @@ export function AppSidebar() {
           const active =
             item.label === "Inbox"
               ? pathname.startsWith("/chat")
-              : pathname === item.href ||
+              : item.label === "Docs"
+                ? pathname.startsWith("/docs")
+                : pathname === item.href ||
                 (item.label === "Home" && pathname === "/dashboard")
 
           return (

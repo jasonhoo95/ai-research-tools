@@ -16,6 +16,33 @@ export interface ChatRequestBody {
 	system?: string;
 	/** Lets the backend search files uploaded earlier in this chat. */
 	chatId?: string;
+	/** Only search these files of the chat (e.g. the open document). */
+	fileIds?: string[];
+}
+
+/** A passage from an uploaded file that an answer used. */
+export interface FileReference {
+	fileId: string;
+	fileName: string;
+	/** PDF page (1-based), when known. */
+	page?: number;
+	chunkIndex: number;
+	/** The passage text, used to highlight it in the viewer. */
+	text: string;
+}
+
+/** A document uploaded to a chat or docs workspace. */
+export interface ChatFileItem {
+	id: string;
+	name: string;
+	mimeType: string;
+	sizeBytes: number;
+	kind: string;
+	chunkCount: number;
+	messageId: string | null;
+	createdAt: string;
+	/** The original is stored, so it can be previewed. */
+	previewable: boolean;
 }
 
 /** A file (and its pages) an answer was drawn from. */
@@ -236,6 +263,8 @@ export interface ChatResponse {
 	searchProvider?: SearchProvider;
 	/** Uploaded files whose excerpts were used to answer. */
 	fileSources?: FileSource[];
+	/** The passages used, best match first. */
+	fileReferences?: FileReference[];
 }
 
 /** A file sent with a chat message. */

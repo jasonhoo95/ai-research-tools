@@ -20,6 +20,9 @@ export const chatClient = {
     title?: string
     prompt: string
     history?: ChatHistoryItem[]
+    /** Build it from this chat's uploaded documents where relevant. */
+    chatId?: string
+    fileIds?: string[]
   }): Promise<GeneratedArtifact> {
     const { data } = await appApi.post<GeneratedArtifact>("/chat/artifact", body)
     return data

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { MessageSquare, Trash2 } from "lucide-react"
 
 import { NewChatDialog, type NewChatValues } from "@/components/chat/new-chat-dialog"
-import { chatRepo, type ChatRow } from "@/lib/chat-repo"
+import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
 
 function formatRelative(iso: string) {
   const d = new Date(iso)
@@ -33,7 +33,7 @@ export default function ChatListPage() {
     chatRepo
       .listChats()
       .then((rows) => {
-        if (alive) setChats(rows)
+        if (alive) setChats(rows.filter(isPlainChat))
       })
       .catch((err: Error) => {
         if (alive) setError(err.message)

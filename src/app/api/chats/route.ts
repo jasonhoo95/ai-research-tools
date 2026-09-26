@@ -4,7 +4,8 @@ import api, { headersFromIncoming, proxyErrorPayload, proxyValidateStatus } from
 
 export async function GET(request: NextRequest) {
   try {
-    const upstream = await api.get("/chats", {
+    // Forward ?kind=chat|docs.
+    const upstream = await api.get(`/chats${request.nextUrl.search}`, {
       headers: headersFromIncoming(request.headers),
       validateStatus: proxyValidateStatus,
     })

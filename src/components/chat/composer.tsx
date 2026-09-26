@@ -34,9 +34,22 @@ interface Props {
   onSend: (message: string, files: File[]) => void
   pending: boolean
   onFileError?: (message: string) => void
+  /** Placeholder when nothing is attached. */
+  placeholder?: string
+  /** Label of the attach button (e.g. "Add documents"). */
+  attachLabel?: string
+  /** Accept files dropped anywhere on the page (off when the page handles drops). */
+  dropAnywhere?: boolean
 }
 
-export function Composer({ onSend, pending, onFileError }: Props) {
+export function Composer({
+  onSend,
+  pending,
+  onFileError,
+  placeholder,
+  attachLabel = "Attach files",
+  dropAnywhere = true,
+}: Props) {
   const [input, setInput] = React.useState("")
   const [files, setFiles] = React.useState<PendingFile[]>([])
   const [dragging, setDragging] = React.useState(false)
@@ -136,7 +149,7 @@ export function Composer({ onSend, pending, onFileError }: Props) {
 
   // Drop files anywhere on the page, like ChatGPT.
   React.useEffect(() => {
-    if (pending) return
+    if (pending || !dropAnywhere) return
     let depth = 0
     const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files")
     const onEnter = (e: DragEvent) => {
@@ -170,7 +183,7 @@ export function Composer({ onSend, pending, onFileError }: Props) {
       window.removeEventListener("dragover", onOver)
       window.removeEventListener("drop", onDrop)
     }
-  }, [pending, addFiles])
+  }, [pending, addFiles, dropAnywhere])
 
   const totalBytes = files.reduce((sum, f) => sum + f.file.size, 0)
 
@@ -266,8 +279,8 @@ export function Composer({ onSend, pending, onFileError }: Props) {
               type="button"
               disabled={pending || files.length >= MAX_FILES}
               onClick={() => fileInputRef.current?.click()}
-              title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} files` : "Attach files"}
-              aria-label="Attach files"
+              title={files.length >= MAX_FILES ? `Up to ${MAX_FILES} files` : attachLabel}
+              aria-label={attachLabel}
               className="mb-0.5 flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
             >
               <Paperclip className="size-[18px]" />
@@ -295,7 +308,7 @@ export function Composer({ onSend, pending, onFileError }: Props) {
                   ? "Compare, extract or summarise these files…"
                   : files.length === 1
                     ? "Ask about this file…"
-                    : "Type @ to select or ask anything!"
+                    : (placeholder ?? "Type @ to select or ask anything!")
               }
               disabled={pending}
               className={cn(

@@ -4,7 +4,9 @@ import { ApiError, appApi } from "@/lib/api";
 import { normalizeArtifactChatRow } from "@/lib/artifact-chat-row";
 import type {
 	Artifact,
+	ChatFileItem,
 	CitationSource,
+	FileReference,
 	FileSource,
 	GeneratedArtifact,
 	MessageAttachment,
@@ -22,10 +24,17 @@ export interface MessageArtifactResult {
 	storedArtifact: Record<string, unknown>;
 }
 
+export type ChatKind = "chat" | "docs";
+
+/** Normal chats only — docs workspaces are listed on /docs. */
+export const isPlainChat = (chat: ChatRow) => chat.kind !== "docs";
+
 export interface ChatRow {
 	id: string;
 	title: string;
 	description: string | null;
+	/** Missing before the docs migration: treat as "chat". */
+	kind?: ChatKind;
 	created_at: string;
 	updated_at: string;
 }
@@ -45,6 +54,8 @@ export interface MessageContent {
 	searchProvider?: SearchProvider;
 	/** Uploaded files whose excerpts the answer used. */
 	fileSources?: FileSource[];
+	/** The passages used, for highlighting in the docs viewer. */
+	fileReferences?: FileReference[];
 }
 
 export interface MessageRow {
@@ -93,9 +104,11 @@ export interface ArtifactChatRow {
 }
 
 export const chatRepo = {
-	async listChats(): Promise<ChatRow[]> {
-		const { data } =
-			await appApi.get<ChatRow[]>("/chats");
+	/** All chats, or only one kind (docs workspaces need the docs migration). */
+	async listChats(kind?: ChatKind): Promise<ChatRow[]> {
+		const { data } = await appApi.get<ChatRow[]>("/chats", {
+			params: kind ? { kind } : undefined,
+		});
 		return data;
 	},
 
@@ -122,6 +135,7 @@ export const chatRepo = {
 	async createChat(input: {
 		title: string;
 		description?: string;
+		kind?: ChatKind;
 	}): Promise<ChatRow> {
 		const { data } =
 			await appApi.post<ChatRow>(
@@ -230,6 +244,43 @@ export const chatRepo = {
 				return null;
 			throw err;
 		}
+	},
+
+	/** Documents uploaded to a chat, in upload order. */
+	async listFiles(chatId: string): Promise<ChatFileItem[]> {
+		const { data } = await appApi.get<ChatFileItem[]>(`/chats/${chatId}/files`);
+		return data;
+	},
+
+	/** Upload and index documents; each file succeeds or fails on its own. */
+	async uploadFiles(
+		chatId: string,
+		files: File[],
+	): Promise<Array<{ name: string; file?: ChatFileItem; error?: string }>> {
+		const form = new FormData();
+		for (const file of files) form.append("files", file);
+		const { data } = await appApi.post<
+			Array<{ name: string; file?: ChatFileItem; error?: string }>
+		>(`/chats/${chatId}/files`, form, { timeout: 5 * 60_000 });
+		return data;
+	},
+
+	/** Short-lived link to a document's original, for the viewer. */
+	async fileUrl(
+		chatId: string,
+		fileId: string,
+	): Promise<{ url: string; name: string; mimeType: string; expiresIn: number }> {
+		const { data } = await appApi.get<{
+			url: string;
+			name: string;
+			mimeType: string;
+			expiresIn: number;
+		}>(`/chats/${chatId}/files/${fileId}/url`);
+		return data;
+	},
+
+	async deleteFile(chatId: string, fileId: string): Promise<void> {
+		await appApi.delete(`/chats/${chatId}/files/${fileId}`);
 	},
 
 	async listArtifacts(
