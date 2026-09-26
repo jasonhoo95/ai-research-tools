@@ -5,6 +5,7 @@ import {
   BarChart3,
   Brain,
   Loader2,
+  Network,
   Plus,
   Presentation,
   StickyNote,
@@ -96,6 +97,14 @@ const KIND_OPTIONS: KindOption[] = [
     icon: Brain,
     tint: "bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400",
     placeholder: "e.g. 8 questions testing what we discussed about Najib's pardon",
+  },
+  {
+    kind: "mindmap",
+    label: "Mind map",
+    description: "A flow of connected ideas or events",
+    icon: Network,
+    tint: "bg-teal-50 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400",
+    placeholder: "e.g. The sequence of World War 1, from its causes to the Treaty of Versailles",
   },
 ]
 

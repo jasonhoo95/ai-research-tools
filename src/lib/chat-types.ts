@@ -33,7 +33,8 @@ export type ArtifactKind =
 	| "notesboard"
 	| "notes"
 	| "bio"
-	| "quiz";
+	| "quiz"
+	| "mindmap";
 
 export interface ChartDataPoint {
 	label: string;
@@ -164,6 +165,32 @@ export interface QuizArtifact {
 	questions: QuizQuestion[];
 }
 
+export interface MindmapNode {
+	id: string;
+	title: string;
+	/** Details shown when the node is opened. Markdown. */
+	description: string;
+	/** Saved canvas position; absent until laid out or moved. */
+	position?: { x: number; y: number };
+}
+
+export interface MindmapEdge {
+	id: string;
+	/** Edges point from the earlier / parent node to the later one. */
+	source: string;
+	target: string;
+	label?: string;
+}
+
+/** Mind map / flow of a topic; nodes are listed in sequence. */
+export interface MindmapArtifact {
+	kind: "mindmap";
+	title: string;
+	description?: string;
+	nodes: MindmapNode[];
+	edges: MindmapEdge[];
+}
+
 export type Artifact =
 	| ChartArtifact
 	| TableArtifact
@@ -171,7 +198,8 @@ export type Artifact =
 	| NotesboardArtifact
 	| NotesArtifact
 	| BioArtifact
-	| QuizArtifact;
+	| QuizArtifact
+	| MindmapArtifact;
 
 export interface GeneratedArtifact {
 	id: string;

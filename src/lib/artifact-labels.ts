@@ -16,6 +16,8 @@ export function artifactKindLabel(kind: ArtifactKind): string {
       return "Profile"
     case "quiz":
       return "Quiz"
+    case "mindmap":
+      return "Mind map"
   }
 }
 
@@ -35,5 +37,7 @@ export function artifactKindIcon(kind: ArtifactKind): string {
       return "👤"
     case "quiz":
       return "🧠"
+    case "mindmap":
+      return "🗺️"
   }
 }
