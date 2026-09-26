@@ -31,12 +31,18 @@ export const chatClient = {
     message: string
     system?: string
     history?: ChatHistoryItem[]
+    /** Index the files into this chat so follow-ups can search them. */
+    chatId?: string
+    /** The user message the files were sent with. */
+    messageId?: string
   }): Promise<FileChatResponse> {
     const form = new FormData()
     for (const file of args.files) form.append("files", file)
     form.append("message", args.message)
     if (args.system) form.append("system", args.system)
     if (args.history) form.append("history", JSON.stringify(args.history))
+    if (args.chatId) form.append("chatId", args.chatId)
+    if (args.messageId) form.append("messageId", args.messageId)
 
     const { data } = await appApi.post<FileChatResponse>("/chat/file", form)
     return data

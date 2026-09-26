@@ -5,6 +5,7 @@ import { normalizeArtifactChatRow } from "@/lib/artifact-chat-row";
 import type {
 	Artifact,
 	CitationSource,
+	FileSource,
 	GeneratedArtifact,
 	MessageAttachment,
 	SearchProvider,
@@ -42,6 +43,8 @@ export interface MessageContent {
 	};
 	sources?: CitationSource[];
 	searchProvider?: SearchProvider;
+	/** Uploaded files whose excerpts the answer used. */
+	fileSources?: FileSource[];
 }
 
 export interface MessageRow {

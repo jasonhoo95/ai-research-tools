@@ -15,7 +15,12 @@ import {
   type MessageContent,
   type MessagePage,
 } from "@/lib/chat-repo"
-import type { ChatHistoryItem, GeneratedArtifact } from "@/lib/chat-types"
+import type {
+  ChatHistoryItem,
+  ChatResponse,
+  FileChatResponse,
+  GeneratedArtifact,
+} from "@/lib/chat-types"
 import { artifactsStore } from "@/lib/artifacts-store"
 import { normalizeGeneratedArtifact } from "@/lib/artifact-chat-row"
 import {
@@ -76,6 +81,7 @@ function contentToBubble(row: {
     artifact: row.content.artifact,
     sources: row.content.sources,
     searchProvider: row.content.searchProvider,
+    fileSources: row.content.fileSources,
   }
 }
 
@@ -481,13 +487,23 @@ export default function ChatConversationPage() {
             ? "Please summarize this file and highlight its key points."
             : "")
 
-      const data = files.length
+      const data: ChatResponse & Pick<Partial<FileChatResponse>, "indexed"> = files.length
         ? await chatClient.askWithFiles({
           files,
           message: questionForGemini,
           history,
+          chatId,
+          messageId: savedUser.id,
         })
-        : await chatClient.ask({ message: questionForGemini, history })
+        : await chatClient.ask({ message: questionForGemini, history, chatId })
+      // Answers still arrive when indexing fails; follow-ups just can't
+      // search those files.
+      const notIndexed = (data.indexed ?? []).filter((f) => f.error).map((f) => f.name)
+      if (notIndexed.length) {
+        setError(
+          `Couldn't index ${notIndexed.join(", ")} for follow-up questions. You can still ask about ${notIndexed.length > 1 ? "them" : "it"} by attaching again.`,
+        )
+      }
       if (data.artifact) {
         artifactsStore.save(data.artifact)
       }
@@ -500,6 +516,7 @@ export default function ChatConversationPage() {
           : undefined,
         sources: data.sources,
         searchProvider: data.searchProvider,
+        fileSources: data.fileSources?.length ? data.fileSources : undefined,
       }
       const savedAssistant = await chatRepo.appendMessage(chatId, assistantContent)
 
@@ -513,6 +530,7 @@ export default function ChatConversationPage() {
           content: assistantContent.text,
           sources: assistantContent.sources,
           searchProvider: assistantContent.searchProvider,
+          fileSources: assistantContent.fileSources,
         },
       ])
       setScrollTarget({ kind: "bottom", smooth: true })

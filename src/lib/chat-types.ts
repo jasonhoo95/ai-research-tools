@@ -14,6 +14,14 @@ export interface ChatRequestBody {
 	message: string;
 	history?: ChatHistoryItem[];
 	system?: string;
+	/** Lets the backend search files uploaded earlier in this chat. */
+	chatId?: string;
+}
+
+/** A file (and its pages) an answer was drawn from. */
+export interface FileSource {
+	fileName: string;
+	pages: number[];
 }
 
 export interface ChatUsage {
@@ -226,6 +234,8 @@ export interface ChatResponse {
 	artifact?: GeneratedArtifact;
 	sources?: CitationSource[];
 	searchProvider?: SearchProvider;
+	/** Uploaded files whose excerpts were used to answer. */
+	fileSources?: FileSource[];
 }
 
 /** A file sent with a chat message. */
@@ -248,4 +258,6 @@ export interface FileChatResponse extends ChatResponse {
 	file: UploadedFileSummary;
 	/** Every file sent, in order. */
 	files?: UploadedFileSummary[];
+	/** Whether each file was indexed so follow-up questions can search it. */
+	indexed?: Array<{ name: string; chunkCount?: number; error?: string }>;
 }

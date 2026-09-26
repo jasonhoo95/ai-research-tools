@@ -1,12 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Bookmark, BookmarkCheck, Pin, StickyNote } from "lucide-react"
+import { Bookmark, BookmarkCheck, FileSearch, Pin, StickyNote } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Markdown } from "@/components/markdown"
 import { cn } from "@/lib/utils"
 import type {
   CitationSource,
+  FileSource,
   GeneratedArtifact,
   MessageAttachment,
   SearchProvider,
@@ -31,6 +32,8 @@ export interface ChatBubbleMessage {
   }
   sources?: CitationSource[]
   searchProvider?: SearchProvider
+  /** Uploaded files (and pages) the answer drew on. */
+  fileSources?: FileSource[]
   /** ISO timestamp — drives the day separators in the message list. */
   createdAt?: string
   /** Pinned to the chat's side panel. */
@@ -157,7 +160,10 @@ export function MessageBubble({
                     chatbotId={chatbotId}
                   />
                 )}
-                {!isUser && message.sources?.length ? (
+                {!isUser && message.fileSources?.length ? (
+                <FileSources sources={message.fileSources} />
+              ) : null}
+              {!isUser && message.sources?.length ? (
                   <Citations
                     sources={message.sources}
                     provider={message.searchProvider}
@@ -297,5 +303,29 @@ export function TypingDots() {
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
     </span>
+  )
+}
+
+/** "From your files" line under an answer that used uploaded files. */
+function FileSources({ sources }: { sources: FileSource[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <FileSearch className="size-3.5 shrink-0" aria-hidden />
+      <span>From your files:</span>
+      {sources.map((source) => (
+        <span
+          key={source.fileName}
+          className="inline-flex max-w-60 items-center gap-1 rounded-full border bg-background/70 px-2 py-0.5 text-foreground"
+          title={source.fileName}
+        >
+          <span className="truncate">{source.fileName}</span>
+          {source.pages.length ? (
+            <span className="shrink-0 text-muted-foreground">
+              · p. {source.pages.join(", ")}
+            </span>
+          ) : null}
+        </span>
+      ))}
+    </div>
   )
 }
