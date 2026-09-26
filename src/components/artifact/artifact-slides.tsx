@@ -290,6 +290,37 @@ function isEditableTarget(target: EventTarget | null) {
 let keySeq = 0
 const newKey = () => `slide-${++keySeq}`
 
+/** How long presentation controls stay up after the pointer stops moving. */
+const CONTROLS_IDLE_MS = 2500
+
+/**
+ * Presentation controls: shown while the viewer moves the pointer, taps or
+ * presses a key, faded out after a short idle so they don't cover the slide.
+ * `wake` shows them right away (e.g. when the presentation starts).
+ */
+function useControlsVisibility(active: boolean) {
+  const [visible, setVisible] = React.useState(true)
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const wake = React.useCallback(() => {
+    setVisible(true)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setVisible(false), CONTROLS_IDLE_MS)
+  }, [])
+
+  React.useEffect(() => {
+    if (!active) return
+    const events = ["mousemove", "pointerdown", "keydown", "touchstart"] as const
+    for (const name of events) window.addEventListener(name, wake, { passive: true })
+    return () => {
+      for (const name of events) window.removeEventListener(name, wake)
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [active, wake])
+
+  return [visible, wake] as const
+}
+
 export function ArtifactSlides({
   data,
   artifact,
@@ -445,6 +476,7 @@ export function ArtifactSlides({
 
   const stageRef = React.useRef<HTMLDivElement>(null)
   const [presenting, setPresenting] = React.useState(false)
+  const [controlsVisible, wakeControls] = useControlsVisibility(presenting)
 
   // Presenting always shows a full-window overlay; real fullscreen is a
   // bonus where the browser allows it (it can be blocked, e.g. in iframes).
@@ -472,6 +504,7 @@ export function ArtifactSlides({
       return
     }
     setPresenting(true)
+    wakeControls()
     stageRef.current?.requestFullscreen?.().catch(() => {})
   }
 
@@ -646,20 +679,54 @@ export function ArtifactSlides({
           </div>
 
           {presenting && (
-            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-white opacity-0 backdrop-blur transition-opacity hover:opacity-100 focus-within:opacity-100">
-              <button type="button" onClick={() => go(-1)} disabled={index === 0} aria-label="Previous slide" className="rounded-full p-1.5 hover:bg-white/15 disabled:opacity-40">
-                <ChevronLeft className="size-4" />
+            <>
+              {/* Arrows on the screen edges, like a slideshow viewer. */}
+              <button
+                type="button"
+                onClick={() => go(-1)}
+                aria-label="Previous slide"
+                tabIndex={index === 0 ? -1 : 0}
+                className={cn(
+                  "absolute top-1/2 left-4 flex size-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-lg ring-1 ring-white/15 backdrop-blur transition-opacity duration-300 hover:bg-black/70 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none sm:left-6",
+                  (!controlsVisible || index === 0) && "pointer-events-none opacity-0",
+                )}
+              >
+                <ChevronLeft className="size-6" />
               </button>
-              <span className="px-1 text-xs tabular-nums">
-                {index + 1} / {total}
-              </span>
-              <button type="button" onClick={() => go(1)} disabled={index === total - 1} aria-label="Next slide" className="rounded-full p-1.5 hover:bg-white/15 disabled:opacity-40">
-                <ChevronRight className="size-4" />
+              <button
+                type="button"
+                onClick={() => go(1)}
+                aria-label="Next slide"
+                tabIndex={index === total - 1 ? -1 : 0}
+                className={cn(
+                  "absolute top-1/2 right-4 flex size-12 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white shadow-lg ring-1 ring-white/15 backdrop-blur transition-opacity duration-300 hover:bg-black/70 focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:outline-none sm:right-6",
+                  (!controlsVisible || index === total - 1) && "pointer-events-none opacity-0",
+                )}
+              >
+                <ChevronRight className="size-6" />
               </button>
-              <button type="button" onClick={togglePresent} aria-label="Exit presentation" className="rounded-full p-1.5 hover:bg-white/15">
-                <Minimize2 className="size-4" />
-              </button>
-            </div>
+
+              <div
+                className={cn(
+                  "absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-white shadow-lg ring-1 ring-white/15 backdrop-blur transition-opacity duration-300",
+                  !controlsVisible && "pointer-events-none opacity-0",
+                )}
+              >
+                <button type="button" onClick={() => go(-1)} disabled={index === 0} aria-label="Previous slide" className="rounded-full p-1.5 hover:bg-white/15 disabled:opacity-40">
+                  <ChevronLeft className="size-4" />
+                </button>
+                <span className="px-1 text-xs tabular-nums">
+                  {index + 1} / {total}
+                </span>
+                <button type="button" onClick={() => go(1)} disabled={index === total - 1} aria-label="Next slide" className="rounded-full p-1.5 hover:bg-white/15 disabled:opacity-40">
+                  <ChevronRight className="size-4" />
+                </button>
+                <span className="mx-1 h-4 w-px bg-white/20" />
+                <button type="button" onClick={togglePresent} aria-label="Exit presentation" className="rounded-full p-1.5 hover:bg-white/15">
+                  <Minimize2 className="size-4" />
+                </button>
+              </div>
+            </>
           )}
         </div>
 
