@@ -62,9 +62,9 @@ import {
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
 import type { MindmapArtifact } from "@/lib/chat-types"
 import { cn } from "@/lib/utils"
+import { useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 /** Nodes are a fixed width so the auto layout can predict their size. */
@@ -660,6 +660,8 @@ function MindmapCanvas({
   const lastSavedRef = React.useRef<string | null>(null)
   const latestRef = React.useRef({ nodes, edges })
 
+  const saveArtifact = useSaveArtifact()
+
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
@@ -675,13 +677,12 @@ function MindmapCanvas({
     const serialized = JSON.stringify(artifactData)
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
-    chatRepo
-      .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+    saveArtifact(row.parent_chatbot_id, row.id, artifactData as never)
       .catch((err) => {
         lastSavedRef.current = null
         console.error("Failed to save mind map", err)
       })
-  }, [artifact, data])
+  }, [artifact, data, saveArtifact])
 
   // Opening a map is not an edit: its laid-out state counts as saved, so
   // only real changes write back.

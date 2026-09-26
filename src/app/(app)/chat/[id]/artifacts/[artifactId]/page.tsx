@@ -20,6 +20,10 @@ import { ArtifactNotesboard } from "@/components/artifact/artifact-notesboard"
 import { ArtifactBio } from "@/components/artifact/artifact-bio"
 import { ArtifactQuiz } from "@/components/artifact/artifact-quiz"
 import { ArtifactMindmap } from "@/components/artifact/artifact-mindmap"
+import {
+  ArtifactDocumentProvider,
+  ArtifactTitle,
+} from "@/components/artifact/artifact-document"
 
 const KNOWN_KINDS: ReadonlyArray<Artifact["kind"]> = [
   "chart",
@@ -221,8 +225,10 @@ export default function ArtifactFromMessagePage() {
       : null
 
   return (
-    // Fill the content area: header rows keep their height, the artifact
-    // takes the rest and scrolls inside it.
+    // Owns the title (editable heading) and every save from the editors.
+    <ArtifactDocumentProvider key={artifactId} row={view} artifact={artifact}>
+    {/* Fill the content area: header rows keep their height, the artifact
+        takes the rest and scrolls inside it. */}
     <main
       className={`mx-auto flex min-h-0 w-full flex-1 flex-col px-4 pt-6 ${isWideLayout ? "max-w-7xl" : "max-w-5xl"}`}
     >
@@ -247,7 +253,7 @@ export default function ArtifactFromMessagePage() {
               ).toLocaleString()}
             </span>
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">{artifact.title}</h1>
+          <ArtifactTitle />
         </div>
         {saveStatusLabel ? (
           <span
@@ -288,5 +294,6 @@ export default function ArtifactFromMessagePage() {
         </details>
       )}
     </main>
+    </ArtifactDocumentProvider>
   )
 }

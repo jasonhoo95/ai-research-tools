@@ -6,9 +6,9 @@ import TableSetup from "@/components/tables/components/tableSetup"
 import { getCellDisplayValue } from "@/components/tables/crm/table-utils"
 import type { TableArtifact } from "@/lib/chat-types"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
 import type { TableColumn, TableRow } from "@/store/table-store"
+import { useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 
@@ -192,6 +192,8 @@ export function ArtifactTable({
     setRows(nextRows)
   }, [artifact])
 
+  const saveArtifact = useSaveArtifact()
+
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
@@ -214,13 +216,12 @@ export function ArtifactTable({
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
 
-    chatRepo
-      .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+    saveArtifact(row.parent_chatbot_id, row.id, artifactData as never)
       .catch((err) => {
         lastSavedRef.current = null
         console.error("Failed to save table", err)
       })
-  }, [artifact, data])
+  }, [artifact, data, saveArtifact])
 
   // Flush any pending edit when leaving the page.
   React.useEffect(

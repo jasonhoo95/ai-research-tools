@@ -27,8 +27,8 @@ import type {
   BioSectionType,
 } from "@/lib/chat-types"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
 import { ImageUploadDialog } from "@/components/artifact/image-upload-dialog"
+import { useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 
@@ -198,6 +198,8 @@ export function ArtifactBio({
     setKeys(artifact.sections.map(newKey))
   }, [artifact])
 
+  const saveArtifact = useSaveArtifact()
+
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
@@ -215,13 +217,12 @@ export function ArtifactBio({
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
 
-    chatRepo
-      .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+    saveArtifact(row.parent_chatbot_id, row.id, artifactData as never)
       .catch((err) => {
         lastSavedRef.current = null
         console.error("Failed to save profile", err)
       })
-  }, [data])
+  }, [data, saveArtifact])
 
   // Flush any pending edit when leaving the page.
   React.useEffect(

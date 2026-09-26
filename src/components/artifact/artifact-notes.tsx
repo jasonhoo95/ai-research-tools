@@ -9,7 +9,7 @@ import { slateDocumentToMarkdown } from "@/components/slate/lib/slate-to-markdow
 import type { NotesArtifact } from "@/lib/chat-types"
 import { useArtifactStore } from "@/store/artifact-stores"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
+import { useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 
@@ -41,6 +41,8 @@ function NotesMarkdownEditor({ data, markdown }: { data: MessageArtifactResult, 
     const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
     const lastSavedRef = React.useRef<string | null>(null)
 
+    const saveArtifact = useSaveArtifact()
+
     const saveNow = React.useCallback(() => {
         if (saveTimerRef.current) {
             clearTimeout(saveTimerRef.current)
@@ -53,13 +55,12 @@ function NotesMarkdownEditor({ data, markdown }: { data: MessageArtifactResult, 
         if (serialized === lastSavedRef.current) return
         lastSavedRef.current = serialized
 
-        chatRepo
-            .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+        saveArtifact(row.parent_chatbot_id, row.id, artifactData as never)
             .catch((err) => {
                 lastSavedRef.current = null
                 console.error("Failed to save notes", err)
             })
-    }, [row])
+    }, [row, saveArtifact])
 
     // Content last loaded or saved — selection-only changes match it.
     const baselineRef = React.useRef(JSON.stringify(document))

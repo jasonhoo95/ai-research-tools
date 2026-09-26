@@ -18,13 +18,13 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { SlideArtifact, SlideDeckSlide } from "@/lib/chat-types"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
 import {
   resolveSlideTheme,
   type SlideTheme,
   type SlideThemeId,
 } from "@/components/artifact/slide-themes"
 import { SlideThemePicker } from "@/components/artifact/slide-theme-picker"
+import { useArtifactTitle, useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 
@@ -355,6 +355,8 @@ export function ArtifactSlides({
   const total = slides.length
   const slide = slides[index] ?? slides[0]
 
+  const saveArtifact = useSaveArtifact()
+
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
@@ -375,8 +377,7 @@ export function ArtifactSlides({
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
 
-    chatRepo
-      .updateMessageArtifact(
+    saveArtifact(
         row.parent_chatbot_id,
         row.id,
         artifactData as never,
@@ -385,7 +386,7 @@ export function ArtifactSlides({
         lastSavedRef.current = null
         console.error("Failed to save slides", err)
       })
-  }, [data])
+  }, [data, saveArtifact])
 
   const scheduleSave = React.useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
@@ -476,6 +477,8 @@ export function ArtifactSlides({
 
   const stageRef = React.useRef<HTMLDivElement>(null)
   const [presenting, setPresenting] = React.useState(false)
+  // Follows renames made in the page heading.
+  const deckTitle = useArtifactTitle(artifact.title)
   const [controlsVisible, wakeControls] = useControlsVisibility(presenting)
 
   // Presenting always shows a full-window overlay; real fullscreen is a
@@ -562,7 +565,7 @@ export function ArtifactSlides({
                   theme={theme}
                   layout={thumbLayout}
                   title={s.title}
-                  deckTitle={artifact.title}
+                  deckTitle={deckTitle}
                   number={i + 1}
                   total={total}
                   body={
@@ -663,7 +666,7 @@ export function ArtifactSlides({
               layout={layout}
               title={slide.title}
               onTitleChange={handleTitleChange}
-              deckTitle={artifact.title}
+              deckTitle={deckTitle}
               number={index + 1}
               total={total}
               body={

@@ -40,13 +40,13 @@ import type {
   QuizQuestion,
 } from "@/lib/chat-types"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
 import {
   DIFFICULTY_STYLES,
   QuizPlayer,
   optionLetter,
   playableQuestions,
 } from "@/components/artifact/quiz-player"
+import { useArtifactTitle, useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 const MIN_OPTIONS = 2
@@ -381,6 +381,8 @@ export function ArtifactQuiz({
 }) {
   const [quiz, setQuiz] = React.useState(artifact)
   const [playing, setPlaying] = React.useState(false)
+  // Shared with the page heading, so renaming either updates both.
+  const title = useArtifactTitle(quiz.title)
   const quizRef = React.useRef(quiz)
   const saveTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedRef = React.useRef<string | null>(null)
@@ -390,6 +392,8 @@ export function ArtifactQuiz({
     quizRef.current = artifact
     setQuiz(artifact)
   }, [artifact])
+
+  const saveArtifact = useSaveArtifact()
 
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
@@ -408,13 +412,12 @@ export function ArtifactQuiz({
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
 
-    chatRepo
-      .updateMessageArtifact(row.parent_chatbot_id, row.id, artifactData as never)
+    saveArtifact(row.parent_chatbot_id, row.id, artifactData as never)
       .catch((err) => {
         lastSavedRef.current = null
         console.error("Failed to save quiz", err)
       })
-  }, [data])
+  }, [data, saveArtifact])
 
   // Flush any pending edit when leaving the page.
   React.useEffect(
@@ -532,7 +535,7 @@ export function ArtifactQuiz({
               Study material
             </span>
             <InlineInput
-              value={quiz.title}
+              value={title}
               onChange={(title) => commit((prev) => ({ ...prev, title }))}
               placeholder="Quiz title"
               label="Quiz title"
@@ -633,7 +636,7 @@ export function ArtifactQuiz({
 
       {playing ? (
         <QuizPlayer
-          title={quiz.title}
+          title={title}
           questions={playable}
           onClose={() => setPlaying(false)}
         />

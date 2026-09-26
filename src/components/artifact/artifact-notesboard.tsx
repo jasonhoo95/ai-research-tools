@@ -7,7 +7,7 @@ import { NotesGrid, type MasonryItem } from "@/components/notes"
 import type { NotesboardArtifact, NotesboardNote } from "@/lib/chat-types"
 import { markdownToSlateDocument } from "@/components/slate/lib/markdown-to-slate"
 import type { MessageArtifactResult } from "@/lib/chat-repo"
-import { chatRepo } from "@/lib/chat-repo"
+import { useSaveArtifact } from "@/components/artifact/artifact-document"
 
 const SAVE_DELAY_MS = 600
 
@@ -73,6 +73,8 @@ export function ArtifactNotesboard({
     setItems(next)
   }, [artifact])
 
+  const saveArtifact = useSaveArtifact()
+
   const saveNow = React.useCallback(() => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current)
@@ -109,8 +111,7 @@ export function ArtifactNotesboard({
     if (serialized === lastSavedRef.current) return
     lastSavedRef.current = serialized
 
-    chatRepo
-      .updateMessageArtifact(
+    saveArtifact(
         row.parent_chatbot_id,
         row.id,
         artifactData as never,
@@ -119,7 +120,7 @@ export function ArtifactNotesboard({
         lastSavedRef.current = null
         console.error("Failed to save notesboard", err)
       })
-  }, [data])
+  }, [data, saveArtifact])
 
   const scheduleSave = React.useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
