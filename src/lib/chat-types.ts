@@ -69,7 +69,8 @@ export type ArtifactKind =
 	| "notes"
 	| "bio"
 	| "quiz"
-	| "mindmap";
+	| "mindmap"
+	| "highlight";
 
 export interface ChartDataPoint {
 	label: string;
@@ -226,6 +227,27 @@ export interface MindmapArtifact {
 	edges: MindmapEdge[];
 }
 
+/**
+ * Text the user highlighted in a docs workspace document, with their note.
+ * Found again in the rendered document by its quote and surrounding text.
+ */
+export interface HighlightArtifact {
+	kind: "highlight";
+	title: string;
+	/** The user's note. Markdown. */
+	description?: string;
+	/** The selected text. */
+	quote: string;
+	/** Normalised text just before and after the quote, to tell repeats apart. */
+	prefix?: string;
+	suffix?: string;
+	fileId: string;
+	fileName: string;
+	/** PDF pages the selection starts and ends on. */
+	page?: number;
+	endPage?: number;
+}
+
 export type Artifact =
 	| ChartArtifact
 	| TableArtifact
@@ -234,7 +256,8 @@ export type Artifact =
 	| NotesArtifact
 	| BioArtifact
 	| QuizArtifact
-	| MindmapArtifact;
+	| MindmapArtifact
+	| HighlightArtifact;
 
 export interface GeneratedArtifact {
 	id: string;

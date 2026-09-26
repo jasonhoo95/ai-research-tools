@@ -3,20 +3,31 @@
 import * as React from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { FileSearch, PanelLeft, Upload, X } from "lucide-react"
+import { Highlighter, PanelLeft, Upload, X } from "lucide-react"
 
-import { ChatThread } from "@/components/chat/chat-thread"
-import type { ChatBubbleMessage } from "@/components/chat/message-bubble"
-import { DocumentViewer, type ViewerFocus } from "@/components/docs/document-viewer"
+import { ChatThread, type ChatThreadHandle } from "@/components/chat/chat-thread"
+import type { ChatArtifactItem } from "@/components/chat/artifacts-panel"
+import { DocumentViewer } from "@/components/docs/document-viewer"
 import {
   DOCUMENT_ACCEPT,
   DocumentsPanel,
   type UploadItem,
 } from "@/components/docs/documents-panel"
+import {
+  HighlightSheet,
+  InsertHighlightDialog,
+  highlightSource,
+  type HighlightNote,
+} from "@/components/docs/highlight-dialogs"
+import type {
+  DocHighlight,
+  HighlightFocus,
+  NewHighlight,
+} from "@/components/docs/highlight-layer"
 import { buttonVariants } from "@/components/ui/button"
 import { ApiError } from "@/lib/api"
-import { chatRepo, type ChatRow } from "@/lib/chat-repo"
-import type { ChatFileItem, FileReference } from "@/lib/chat-types"
+import { chatRepo, type ArtifactChatRow, type ChatRow } from "@/lib/chat-repo"
+import type { ChatFileItem, GeneratedArtifact, HighlightArtifact } from "@/lib/chat-types"
 import { takePendingUploads } from "@/lib/pending-uploads"
 import { cn } from "@/lib/utils"
 
@@ -36,9 +47,17 @@ function isDocument(file: File) {
   )
 }
 
+/** Saved highlights among a chat's artifacts. */
+function highlightsFrom(rows: ArtifactChatRow[]): DocHighlight[] {
+  return rows.flatMap((row) => {
+    const artifact = row.content?.artifact
+    return artifact?.kind === "highlight" ? [{ id: row.id, artifact }] : []
+  })
+}
+
 /**
  * A research workspace: upload PDFs and Word documents, preview them, and ask
- * questions across them. Clicking an answer highlights the passages it used.
+ * questions across them. Selected text can be kept as a highlight with a note.
  */
 export default function DocsWorkspacePage() {
   const params = useParams<{ id: string }>()
@@ -57,10 +76,16 @@ export default function DocsWorkspacePage() {
   const [scope, setScope] = React.useState<"all" | "current">("all")
   const [dragging, setDragging] = React.useState(false)
 
-  // The answer whose passages are shown, and the one to scroll to.
-  const [activeMessageId, setActiveMessageId] = React.useState<string | null>(null)
-  const [references, setReferences] = React.useState<FileReference[]>([])
-  const [focus, setFocus] = React.useState<ViewerFocus | null>(null)
+  // Highlights live in the chat's artifacts, which the thread loads and owns.
+  const threadRef = React.useRef<ChatThreadHandle>(null)
+  const [highlights, setHighlights] = React.useState<DocHighlight[]>([])
+  const [focus, setFocus] = React.useState<HighlightFocus | null>(null)
+  // Selected text waiting for its title and note.
+  const [draft, setDraft] = React.useState<(NewHighlight & { file: ChatFileItem }) | null>(null)
+  const [insertOpen, setInsertOpen] = React.useState(false)
+  // The sheet's highlight stays set while it slides out.
+  const [openHighlightId, setOpenHighlightId] = React.useState<string | null>(null)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
 
   const activeFile = files.find((f) => f.id === activeFileId) ?? null
 
@@ -186,30 +211,82 @@ export default function DocsWorkspacePage() {
     }
   }, [uploadDocuments])
 
-  /** Show where an answer came from: open the document and highlight. */
-  const showReferences = React.useCallback(
-    (message: ChatBubbleMessage, reference?: FileReference) => {
-      const all = message.fileReferences ?? []
-      const target =
-        reference ?? all.find((r) => files.some((f) => f.id === r.fileId)) ?? all[0]
-      if (!target) return
-      if (!files.some((f) => f.id === target.fileId)) {
-        setNotice(`${target.fileName} is no longer in this workspace.`)
-        return
-      }
-      setNotice(null)
-      setActiveMessageId(message.id)
-      setReferences(all)
-      setActiveFileId(target.fileId)
-      setFocus({ reference: target, key: Date.now() })
-    },
-    [files],
+  const onArtifactsChange = React.useCallback(
+    (rows: ArtifactChatRow[]) => setHighlights(highlightsFrom(rows)),
+    [],
   )
 
-  const clearReferences = () => {
-    setActiveMessageId(null)
-    setReferences([])
-    setFocus(null)
+  /** Open the highlight's document, scroll to it, and optionally its sheet. */
+  const showHighlight = (id: string, { openSheet = false } = {}) => {
+    const highlight = highlights.find((h) => h.id === id)
+    if (!highlight) return
+    if (!files.some((f) => f.id === highlight.artifact.fileId)) {
+      setNotice(`${highlight.artifact.fileName} is no longer in this workspace.`)
+      return
+    }
+    setActiveFileId(highlight.artifact.fileId)
+    setFocus({ id, key: Date.now() })
+    if (openSheet) {
+      setOpenHighlightId(id)
+      setSheetOpen(true)
+    }
+  }
+
+  const selectArtifact = (item: ChatArtifactItem) => {
+    if (item.kind !== "highlight" || !item.rowId) return false
+    showHighlight(item.rowId, { openSheet: true })
+    return true
+  }
+
+  const saveHighlight = async ({ title, description }: HighlightNote) => {
+    if (!draft) return
+    const { file, ...anchor } = draft
+    const artifact: HighlightArtifact = {
+      kind: "highlight",
+      title,
+      ...(description ? { description } : {}),
+      ...anchor,
+      fileId: file.id,
+      fileName: file.name,
+    }
+    const content: GeneratedArtifact = {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      prompt: anchor.quote,
+      artifact,
+    }
+    const row = await chatRepo.saveArtifact(chatId, content)
+    threadRef.current?.addArtifact(row)
+    window.getSelection()?.removeAllRanges()
+    setInsertOpen(false)
+  }
+
+  const openHighlight = highlights.find((h) => h.id === openHighlightId) ?? null
+
+  const updateHighlight = async ({ title, description }: HighlightNote) => {
+    if (!openHighlight) return
+    const artifact: HighlightArtifact = { ...openHighlight.artifact, title, description }
+    if (!description) delete artifact.description
+    const row = await chatRepo.updateArtifact(chatId, openHighlight.id, {
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      prompt: artifact.quote,
+      artifact,
+    })
+    threadRef.current?.replaceArtifact(row)
+  }
+
+  const deleteHighlight = async () => {
+    if (!openHighlight) return
+    await chatRepo.deleteArtifact(chatId, openHighlight.id)
+    threadRef.current?.removeArtifact(openHighlight.id)
+    setSheetOpen(false)
+  }
+
+  const openFileByName = (fileName: string) => {
+    const file = files.find((f) => f.name === fileName)
+    if (file) setActiveFileId(file.id)
+    else setNotice(`${fileName} is no longer in this workspace.`)
   }
 
   const deleteDocument = async (file: ChatFileItem) => {
@@ -223,15 +300,17 @@ export default function DocsWorkspacePage() {
     }
   }
 
-  const referenceCounts = React.useMemo(() => {
+  const highlightCounts = React.useMemo(() => {
     const counts = new Map<string, number>()
-    for (const r of references) counts.set(r.fileId, (counts.get(r.fileId) ?? 0) + 1)
+    for (const h of highlights) {
+      counts.set(h.artifact.fileId, (counts.get(h.artifact.fileId) ?? 0) + 1)
+    }
     return counts
-  }, [references])
+  }, [highlights])
 
-  const viewerReferences = React.useMemo(
-    () => references.filter((r) => r.fileId === activeFileId),
-    [references, activeFileId],
+  const viewerHighlights = React.useMemo(
+    () => highlights.filter((h) => h.artifact.fileId === activeFileId),
+    [highlights, activeFileId],
   )
 
   if (status === "loading") {
@@ -281,7 +360,7 @@ export default function DocsWorkspacePage() {
           files={files}
           uploads={uploads}
           activeFileId={activeFileId}
-          referenceCounts={referenceCounts}
+          highlightCounts={highlightCounts}
           onSelect={(id) => {
             setActiveFileId(id)
             setFocus(null)
@@ -312,21 +391,13 @@ export default function DocsWorkspacePage() {
               {activeFile?.name ?? chat?.title}
             </p>
           </div>
-          {activeMessageId && references.length ? (
-            <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#f97316]/10 py-1 pr-1 pl-2.5 text-xs text-[#c2410c]">
-              <FileSearch className="size-3.5" />
-              {viewerReferences.length
-                ? `${viewerReferences.length} passage${viewerReferences.length === 1 ? "" : "s"} highlighted`
-                : "No passages in this document"}
-              <button
-                type="button"
-                onClick={clearReferences}
-                aria-label="Clear highlights"
-                className="flex size-5 items-center justify-center rounded-full hover:bg-[#f97316]/15"
-              >
-                <X className="size-3" />
-              </button>
-            </div>
+          {activeFile?.previewable ? (
+            <p className="hidden shrink-0 items-center gap-1.5 text-xs text-muted-foreground lg:flex">
+              <Highlighter className="size-3.5" />
+              {viewerHighlights.length
+                ? `${viewerHighlights.length} highlight${viewerHighlights.length === 1 ? "" : "s"} · select text to add more`
+                : "Select text to insert a highlight"}
+            </p>
           ) : null}
         </header>
         {notice ? (
@@ -342,8 +413,16 @@ export default function DocsWorkspacePage() {
             <DocumentViewer
               chatId={chatId}
               file={activeFile}
-              references={viewerReferences}
-              focus={focus?.reference.fileId === activeFile.id ? focus : null}
+              highlights={viewerHighlights}
+              focus={focus}
+              onCreateHighlight={(highlight) => {
+                setDraft({ ...highlight, file: activeFile })
+                setInsertOpen(true)
+              }}
+              onOpenHighlight={(id) => {
+                setOpenHighlightId(id)
+                setSheetOpen(true)
+              }}
             />
           ) : (
             <EmptyWorkspace uploading={uploads.some((u) => u.status === "uploading")} onFiles={uploadDocuments} />
@@ -358,8 +437,10 @@ export default function DocsWorkspacePage() {
           variant="docs"
           fileIds={scopedIds}
           onAddDocuments={uploadDocuments}
-          onReferenceSelect={showReferences}
-          activeMessageId={activeMessageId}
+          handleRef={threadRef}
+          onArtifactsChange={onArtifactsChange}
+          onArtifactSelect={selectArtifact}
+          onFileSourceSelect={openFileByName}
           reservePanelSpace={false}
           onPanelOpenChange={setPanelOpen}
           composerPlaceholder={
@@ -369,8 +450,8 @@ export default function DocsWorkspacePage() {
             <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Ask anything about your documents</p>
               <p className="mt-1">
-                Summaries, comparisons, specific facts. Click an answer to see the passages it
-                came from.
+                Summaries, comparisons, specific facts. Select text in a document to keep it as a
+                highlight with your note.
               </p>
             </div>
           }
@@ -407,6 +488,25 @@ export default function DocsWorkspacePage() {
           }
         />
       </section>
+
+      <InsertHighlightDialog
+        open={insertOpen}
+        onOpenChange={setInsertOpen}
+        quote={draft?.quote ?? ""}
+        source={draft ? highlightSource(draft.file.name, draft.page) : ""}
+        onSave={saveHighlight}
+      />
+      <HighlightSheet
+        highlight={openHighlight}
+        open={sheetOpen && Boolean(openHighlight)}
+        onOpenChange={setSheetOpen}
+        onSave={updateHighlight}
+        onDelete={deleteHighlight}
+        onShow={() => {
+          setSheetOpen(false)
+          if (openHighlight) showHighlight(openHighlight.id)
+        }}
+      />
     </div>
   )
 }

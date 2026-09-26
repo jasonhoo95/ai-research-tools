@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils"
 import type { ArtifactKind } from "@/lib/chat-types"
 
 /** Kinds the backend can generate from a prompt. */
-export type CreatableArtifactKind = Exclude<ArtifactKind, "notes">
+export type CreatableArtifactKind = Exclude<ArtifactKind, "notes" | "highlight">
 
 type KindOption = {
   kind: CreatableArtifactKind

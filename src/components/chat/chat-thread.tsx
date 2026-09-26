@@ -18,7 +18,6 @@ import type {
   ChatHistoryItem,
   ChatResponse,
   FileChatResponse,
-  FileReference,
   GeneratedArtifact,
 } from "@/lib/chat-types"
 import { artifactsStore } from "@/lib/artifacts-store"
@@ -119,10 +118,14 @@ export interface ChatThreadProps {
   fileIds?: string[]
   /** Docs: add attached files to the workspace; resolves to the new file ids. */
   onAddDocuments?: (files: File[]) => Promise<string[]>
-  /** Docs: an answer (or one of its sources) was clicked — show its passages. */
-  onReferenceSelect?: (message: ChatBubbleMessage, reference?: FileReference) => void
-  /** Docs: the answer whose passages are shown. */
-  activeMessageId?: string | null
+  /** Docs: one of an answer's source documents was clicked. */
+  onFileSourceSelect?: (fileName: string) => void
+  /** Lets the page add, replace or remove artifacts it saved itself. */
+  handleRef?: React.Ref<ChatThreadHandle>
+  /** The chat's saved artifacts, whenever they change. */
+  onArtifactsChange?: (rows: ArtifactChatRow[]) => void
+  /** An artifact in the side panel was clicked; return true when handled. */
+  onArtifactSelect?: (item: ChatArtifactItem) => boolean
   /** Shown above the composer (docs: which documents questions are about). */
   composerAccessory?: React.ReactNode
   /** Composer placeholder when nothing is attached. */
@@ -137,6 +140,12 @@ export interface ChatThreadProps {
   onPanelOpenChange?: (open: boolean) => void
 }
 
+export interface ChatThreadHandle {
+  addArtifact: (row: ArtifactChatRow) => void
+  replaceArtifact: (row: ArtifactChatRow) => void
+  removeArtifact: (rowId: string) => void
+}
+
 /**
  * A conversation with search, pins, artifacts and the composer. Used by the
  * chat page and by docs workspaces (next to the document viewer).
@@ -146,8 +155,10 @@ export function ChatThread({
   variant = "chat",
   fileIds,
   onAddDocuments,
-  onReferenceSelect,
-  activeMessageId,
+  onFileSourceSelect,
+  handleRef,
+  onArtifactsChange,
+  onArtifactSelect,
   composerAccessory,
   composerPlaceholder,
   emptyState,
@@ -175,6 +186,20 @@ export function ChatThread({
   const [pinnedArtifacts, setPinnedArtifacts] = React.useState<ArtifactChatRow[]>(
     [],
   )
+  React.useImperativeHandle(
+    handleRef,
+    () => ({
+      addArtifact: (row) => setPinnedArtifacts((prev) => [row, ...prev]),
+      replaceArtifact: (row) =>
+        setPinnedArtifacts((prev) => prev.map((r) => (r.id === row.id ? row : r))),
+      removeArtifact: (rowId) =>
+        setPinnedArtifacts((prev) => prev.filter((r) => r.id !== rowId)),
+    }),
+    [],
+  )
+  React.useEffect(() => {
+    onArtifactsChange?.(pinnedArtifacts)
+  }, [pinnedArtifacts, onArtifactsChange])
   const [savingArtifactIds, setSavingArtifactIds] = React.useState<Set<string>>(
     () => new Set(),
   )
@@ -916,27 +941,9 @@ export function ChatThread({
                 {showDate && <DateSeparator iso={m.createdAt!} />}
                 <div
                   data-message-id={m.id}
-                  // Docs: click an answer to highlight the passages it used.
-                  onClick={
-                    isDocs && onReferenceSelect && m.fileReferences?.length
-                      ? (e) => {
-                        // Links, buttons and text selection keep working.
-                        const target = e.target as HTMLElement
-                        if (target.closest("a, button") || window.getSelection()?.toString()) return
-                        onReferenceSelect(m)
-                      }
-                      : undefined
-                  }
                   className={cn(
                     "-mx-3 rounded-2xl px-3 py-1 transition-colors duration-700",
                     highlightId === m.id && "bg-yellow-100/70 dark:bg-yellow-500/15",
-                    isDocs &&
-                      onReferenceSelect &&
-                      m.fileReferences?.length &&
-                      "cursor-pointer transition-colors duration-150 hover:bg-[#f97316]/5",
-                    isDocs &&
-                      activeMessageId === m.id &&
-                      "bg-[#f97316]/8 ring-1 ring-[#f97316]/30",
                   )}
                 >
                 <MessageBubble
@@ -959,15 +966,7 @@ export function ChatThread({
                       ),
                   }}
                   chatbotId={chatId}
-                  onFileSourceClick={
-                    isDocs && onReferenceSelect
-                      ? (fileName) =>
-                        onReferenceSelect(
-                          m,
-                          m.fileReferences?.find((r) => r.fileName === fileName),
-                        )
-                      : undefined
-                  }
+                  onFileSourceClick={isDocs ? onFileSourceSelect : undefined}
                 />
                 </div>
                 </React.Fragment>
@@ -1024,6 +1023,7 @@ export function ChatThread({
         tab={panelTab}
         onTabChange={setPanelTab}
         artifacts={chatArtifacts}
+        onSelect={onArtifactSelect}
         onDelete={handleDeleteArtifact}
         deleting={deletingRowIds}
         chatbotId={chatId}

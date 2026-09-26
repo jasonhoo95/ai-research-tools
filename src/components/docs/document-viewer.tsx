@@ -4,13 +4,15 @@ import * as React from "react"
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist"
 import { AlertCircle, Loader2 } from "lucide-react"
 
+import {
+  HighlightLayer,
+  type DocHighlight,
+  type HighlightFocus,
+  type NewHighlight,
+} from "@/components/docs/highlight-layer"
 import { chatRepo } from "@/lib/chat-repo"
-import type { ChatFileItem, FileReference } from "@/lib/chat-types"
-import { clearHighlights, findPassageRanges, paintHighlights } from "@/lib/passage-highlight"
+import type { ChatFileItem } from "@/lib/chat-types"
 import { loadPdfjs } from "@/lib/pdfjs"
-
-/** A reference to reveal; `key` changes on every click so repeats re-scroll. */
-export type ViewerFocus = { reference: FileReference; key: number }
 
 type Pdfjs = Awaited<ReturnType<typeof loadPdfjs>>
 
@@ -33,70 +35,12 @@ function loadBytes(chatId: string, fileId: string): Promise<ArrayBuffer> {
   return bytes
 }
 
-const sameReference = (a?: FileReference, b?: FileReference) =>
-  Boolean(a && b && a.fileId === b.fileId && a.chunkIndex === b.chunkIndex)
-
-/** Scroll `container` so `range` sits in its upper third. */
-function revealRange(container: HTMLElement, range: Range) {
-  const rect = range.getBoundingClientRect()
-  const box = container.getBoundingClientRect()
-  container.scrollTo({
-    top: container.scrollTop + rect.top - box.top - box.height / 3,
-    behavior: "smooth",
-  })
-}
-
-/**
- * Paint the references found under their roots and scroll to the focused one
- * once. `rootsFor` returns where a reference can be (e.g. its PDF page's text
- * layer, if rendered); `revealMissing` brings an unrendered page into view.
- */
-function useReferenceHighlights({
-  container,
-  references,
-  focus,
-  rootsFor,
-  revealMissing,
-  version,
-}: {
-  container: React.RefObject<HTMLElement | null>
-  references: FileReference[]
-  focus: ViewerFocus | null
-  rootsFor: (reference: FileReference) => Node[]
-  revealMissing?: (reference: FileReference) => boolean
-  /** Changes when more of the document has rendered. */
-  version: unknown
-}) {
-  const revealedKey = React.useRef<number | null>(null)
-
-  React.useEffect(() => {
-    const focusRanges: Range[] = []
-    const otherRanges: Range[] = []
-    for (const reference of references) {
-      for (const root of rootsFor(reference)) {
-        const ranges = findPassageRanges(root, reference.text)
-        if (!ranges.length) continue
-        ;(sameReference(reference, focus?.reference) ? focusRanges : otherRanges).push(...ranges)
-        break
-      }
-    }
-    paintHighlights(focusRanges, otherRanges)
-
-    const box = container.current
-    if (!focus || !box || revealedKey.current === focus.key) return
-    if (focusRanges.length) {
-      revealRange(box, focusRanges[0])
-      revealedKey.current = focus.key
-    } else if (!revealMissing?.(focus.reference)) {
-      // Rendered, but the passage text wasn't found: stop trying.
-      revealedKey.current = focus.key
-    }
-    // rootsFor / revealMissing are recreated each render; `version` tracks
-    // what they depend on.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [references, focus, version])
-
-  React.useEffect(() => clearHighlights, [])
+/** What every view needs to show and create highlights. */
+type HighlightProps = {
+  highlights: DocHighlight[]
+  focus: HighlightFocus | null
+  onCreateHighlight: (highlight: NewHighlight) => void
+  onOpenHighlight: (id: string) => void
 }
 
 // -----------------------------------------------------------------------------
@@ -202,20 +146,13 @@ function PdfPage({
 
 function PdfView({
   data,
-  references,
+  highlights,
   focus,
-}: {
-  data: ArrayBuffer
-  references: FileReference[]
-  focus: ViewerFocus | null
-}) {
-  const scrollRef = React.useRef<HTMLDivElement | null>(null)
-  // Also kept in state: pages observe visibility within it.
+  onCreateHighlight,
+  onOpenHighlight,
+}: HighlightProps & { data: ArrayBuffer }) {
+  // In state: pages observe their visibility within it.
   const [scrollRoot, setScrollRoot] = React.useState<HTMLDivElement | null>(null)
-  const setScrollEl = React.useCallback((el: HTMLDivElement | null) => {
-    scrollRef.current = el
-    setScrollRoot(el)
-  }, [])
   const [pdfjs, setPdfjs] = React.useState<Pdfjs | null>(null)
   const [pages, setPages] = React.useState<PDFPageProxy[]>([])
   const [error, setError] = React.useState<string | null>(null)
@@ -272,35 +209,38 @@ function PdfView({
     })
   }, [])
 
-  useReferenceHighlights({
-    container: scrollRef,
-    references,
-    focus,
-    version: layers,
-    rootsFor: (reference) =>
-      reference.page
-        ? [layers.get(reference.page)].filter((l): l is HTMLElement => Boolean(l))
-        : [...layers.values()],
-    revealMissing: (reference) => {
-      // Its page hasn't rendered yet: scroll to it so it does. (Not
-      // scrollIntoView — that also scrolls the page around the viewer.)
-      if (!reference.page || layers.has(reference.page)) return false
-      const box = scrollRef.current
-      const pageEl = box?.querySelector(`[data-page="${reference.page}"]`)
-      if (!box || !pageEl) return false
-      box.scrollTop += pageEl.getBoundingClientRect().top - box.getBoundingClientRect().top - 16
-      return true
-    },
-  })
+  // Rendered text layers of these pages and their neighbours (context for
+  // telling repeated text apart); none until the first page has rendered.
+  const rootsFor = ({ page, endPage }: { page?: number; endPage?: number }) => {
+    if (!page) return [...layers.keys()].sort((a, b) => a - b).map((p) => layers.get(p)!)
+    if (!layers.has(page)) return []
+    const roots: HTMLElement[] = []
+    for (let p = page - 1; p <= (endPage ?? page) + 1; p++) {
+      const layer = layers.get(p)
+      if (layer) roots.push(layer)
+    }
+    return roots
+  }
+
+  // Scroll an unrendered page into view so it renders. (Not scrollIntoView —
+  // that also scrolls the page around the viewer.)
+  const revealPage = (page: number) => {
+    const box = scrollRoot
+    const pageEl = box?.querySelector(`[data-page="${page}"]`)
+    if (!box || !pageEl) return
+    box.scrollTo({
+      top: box.scrollTop + pageEl.getBoundingClientRect().top - box.getBoundingClientRect().top - 16,
+    })
+  }
 
   return (
-    <div ref={setScrollEl} className="doc-viewer h-full overflow-auto bg-[#f4f4f5]">
+    <div ref={setScrollRoot} className="doc-viewer h-full overflow-auto bg-[#f4f4f5]">
       {error ? (
         <ViewerMessage error>{error}</ViewerMessage>
       ) : !pdfjs || !pages.length || !scale ? (
         <ViewerMessage>Opening PDF…</ViewerMessage>
       ) : (
-        <div className="flex flex-col items-center gap-4 px-6 py-6">
+        <div className="relative flex flex-col items-center gap-4 px-6 py-6">
           {pages.map((page, i) => (
             <PdfPage
               key={i}
@@ -312,6 +252,17 @@ function PdfView({
               onTextLayer={onTextLayer}
             />
           ))}
+          <HighlightLayer
+            scrollEl={scrollRoot}
+            highlights={highlights}
+            version={layers}
+            rootsFor={rootsFor}
+            paged
+            revealPage={revealPage}
+            focus={focus}
+            onCreate={onCreateHighlight}
+            onOpen={onOpenHighlight}
+          />
         </div>
       )}
     </div>
@@ -322,33 +273,9 @@ function PdfView({
 // Word (.docx) and text
 // -----------------------------------------------------------------------------
 
-function useTextHighlights(
-  scrollRef: React.RefObject<HTMLElement | null>,
-  contentRef: React.RefObject<HTMLElement | null>,
-  ready: unknown,
-  references: FileReference[],
-  focus: ViewerFocus | null,
-) {
-  useReferenceHighlights({
-    container: scrollRef,
-    references,
-    focus,
-    version: ready,
-    rootsFor: () => (ready && contentRef.current ? [contentRef.current] : []),
-  })
-}
-
-function DocxView({
-  data,
-  references,
-  focus,
-}: {
-  data: ArrayBuffer
-  references: FileReference[]
-  focus: ViewerFocus | null
-}) {
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const contentRef = React.useRef<HTMLElement>(null)
+function DocxView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuffer }) {
+  const [scrollEl, setScrollEl] = React.useState<HTMLDivElement | null>(null)
+  const [content, setContent] = React.useState<HTMLElement | null>(null)
   const [html, setHtml] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -368,48 +295,65 @@ function DocxView({
     }
   }, [data])
 
-  useTextHighlights(scrollRef, contentRef, html, references, focus)
-
   return (
-    <div ref={scrollRef} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
+    <div ref={setScrollEl} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
       {error ? (
         <ViewerMessage error>{error}</ViewerMessage>
       ) : html === null ? (
         <ViewerMessage>Opening document…</ViewerMessage>
       ) : (
-        <article
-          ref={contentRef}
-          className="docx-content mx-auto max-w-3xl bg-white px-12 py-10 shadow-sm ring-1 ring-black/5"
-          // mammoth escapes the document's text; its HTML is the document itself.
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        <div className="relative mx-auto max-w-3xl">
+          <article
+            ref={setContent}
+            className="docx-content bg-white px-12 py-10 shadow-sm ring-1 ring-black/5"
+            // mammoth escapes the document's text; its HTML is the document itself.
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+          <TextHighlights scrollEl={scrollEl} content={content} {...highlightProps} />
+        </div>
       )}
     </div>
   )
 }
 
-function TextView({
-  data,
-  references,
-  focus,
-}: {
-  data: ArrayBuffer
-  references: FileReference[]
-  focus: ViewerFocus | null
-}) {
-  const scrollRef = React.useRef<HTMLDivElement>(null)
-  const contentRef = React.useRef<HTMLPreElement>(null)
+function TextView({ data, ...highlightProps }: HighlightProps & { data: ArrayBuffer }) {
+  const [scrollEl, setScrollEl] = React.useState<HTMLDivElement | null>(null)
+  const [content, setContent] = React.useState<HTMLPreElement | null>(null)
   const text = React.useMemo(() => new TextDecoder().decode(data), [data])
-  useTextHighlights(scrollRef, contentRef, text, references, focus)
   return (
-    <div ref={scrollRef} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
-      <pre
-        ref={contentRef}
-        className="mx-auto max-w-3xl bg-white px-10 py-8 font-mono text-[13px] leading-6 whitespace-pre-wrap text-[#27272a] shadow-sm ring-1 ring-black/5"
-      >
-        {text}
-      </pre>
+    <div ref={setScrollEl} className="doc-viewer h-full overflow-auto bg-[#f4f4f5] px-6 py-6">
+      <div className="relative mx-auto max-w-3xl">
+        <pre
+          ref={setContent}
+          className="bg-white px-10 py-8 font-mono text-[13px] leading-6 whitespace-pre-wrap text-[#27272a] shadow-sm ring-1 ring-black/5"
+        >
+          {text}
+        </pre>
+        <TextHighlights scrollEl={scrollEl} content={content} {...highlightProps} />
+      </div>
     </div>
+  )
+}
+
+/** Highlights over a single rendered block of text (Word or plain text). */
+function TextHighlights({
+  scrollEl,
+  content,
+  highlights,
+  focus,
+  onCreateHighlight,
+  onOpenHighlight,
+}: HighlightProps & { scrollEl: HTMLElement | null; content: HTMLElement | null }) {
+  return (
+    <HighlightLayer
+      scrollEl={scrollEl}
+      highlights={highlights}
+      version={content}
+      rootsFor={() => (content ? [content] : [])}
+      focus={focus}
+      onCreate={onCreateHighlight}
+      onOpen={onOpenHighlight}
+    />
   )
 }
 
@@ -450,19 +394,15 @@ function ViewerMessage({ children, error }: { children: React.ReactNode; error?:
 
 /**
  * Preview a workspace document (PDF via pdf.js, Word via mammoth, text,
- * images, video) with the passages an answer used highlighted.
+ * images, video). Selected text can be kept as a highlight with a note.
  */
 export function DocumentViewer({
   chatId,
   file,
-  references,
-  focus,
-}: {
+  ...highlightProps
+}: HighlightProps & {
   chatId: string
   file: ChatFileItem
-  /** Passages of this file to highlight. */
-  references: FileReference[]
-  focus: ViewerFocus | null
 }) {
   const [state, setState] = React.useState<
     { fileId: string; data: ArrayBuffer } | { fileId: string; error: string } | null
@@ -493,7 +433,7 @@ export function DocumentViewer({
   if (!state || state.fileId !== file.id) return <ViewerMessage>Loading {file.name}…</ViewerMessage>
   if ("error" in state) return <ViewerMessage error>Couldn&apos;t load {file.name}: {state.error}</ViewerMessage>
 
-  const props = { data: state.data, references, focus }
+  const props = { data: state.data, ...highlightProps }
   switch (file.kind) {
     case "pdf":
       return <PdfView key={file.id} {...props} />

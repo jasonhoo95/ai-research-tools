@@ -14,6 +14,7 @@ const KNOWN_KINDS: ReadonlySet<string> = new Set([
 	"bio",
 	"quiz",
 	"mindmap",
+	"highlight",
 ]);
 
 function isKnownKind(

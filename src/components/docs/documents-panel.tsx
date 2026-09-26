@@ -26,13 +26,13 @@ export const DOCUMENT_ACCEPT =
 
 /**
  * The workspace's documents: pick one to preview, add more, remove them.
- * Documents the selected answer used show how many passages it cited.
+ * Each shows how many highlights it has.
  */
 export function DocumentsPanel({
   files,
   uploads,
   activeFileId,
-  referenceCounts,
+  highlightCounts,
   onSelect,
   onUpload,
   onDelete,
@@ -42,8 +42,8 @@ export function DocumentsPanel({
   files: ChatFileItem[]
   uploads: UploadItem[]
   activeFileId: string | null
-  /** Passages the selected answer cited, per file id. */
-  referenceCounts: ReadonlyMap<string, number>
+  /** Saved highlights per file id. */
+  highlightCounts: ReadonlyMap<string, number>
   onSelect: (fileId: string) => void
   onUpload: (files: File[]) => void
   onDelete: (file: ChatFileItem) => Promise<void>
@@ -111,7 +111,7 @@ export function DocumentsPanel({
         {files.map((file) => {
           const kind = attachmentKind(file.mimeType, file.name)
           const active = file.id === activeFileId
-          const cited = referenceCounts.get(file.id) ?? 0
+          const highlighted = highlightCounts.get(file.id) ?? 0
           return (
             <li key={file.id} className="group/doc relative">
               <button
@@ -134,12 +134,12 @@ export function DocumentsPanel({
                     {attachmentLabel(kind)} · {humanBytes(file.sizeBytes)}
                   </span>
                 </span>
-                {cited > 0 ? (
+                {highlighted > 0 ? (
                   <span
-                    title={`${cited} passage${cited === 1 ? "" : "s"} used in the selected answer`}
-                    className="shrink-0 rounded-full bg-[#f97316] px-1.5 text-[10px] leading-4 font-semibold text-white tabular-nums"
+                    title={`${highlighted} highlight${highlighted === 1 ? "" : "s"}`}
+                    className="shrink-0 rounded-full bg-amber-100 px-1.5 text-[10px] leading-4 font-semibold text-amber-800 tabular-nums"
                   >
-                    {cited}
+                    {highlighted}
                   </span>
                 ) : null}
               </button>

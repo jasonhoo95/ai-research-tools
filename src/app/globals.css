@@ -156,7 +156,7 @@ body:has(.chat-container) {
 
 /* -----------------------------------------------------------------------------
  * Document viewer (/docs): pdf.js text layer (from pdfjs-dist/web/pdf_viewer.css,
- * trimmed to what the viewer uses) and highlighted reference passages.
+ * trimmed to what the viewer uses).
  * -------------------------------------------------------------------------- */
 .doc-viewer .textLayer {
   position: absolute;
@@ -209,14 +209,6 @@ body:has(.chat-container) {
   z-index: 0;
   cursor: default;
   user-select: none;
-}
-
-/* Passages an answer used (CSS Custom Highlight API, set by the viewer). */
-::highlight(doc-reference) {
-  background-color: rgb(249 115 22 / 0.28);
-}
-::highlight(doc-reference-focus) {
-  background-color: rgb(249 115 22 / 0.5);
 }
 
 /* Word documents rendered by mammoth in the document viewer. */

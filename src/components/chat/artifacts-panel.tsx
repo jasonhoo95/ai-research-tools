@@ -46,6 +46,8 @@ type ArtifactsPanelProps = {
   tab: ChatPanelTab
   onTabChange: (tab: ChatPanelTab) => void
   artifacts: ChatArtifactItem[]
+  /** An artifact was clicked; return true when handled (otherwise it opens). */
+  onSelect?: (item: ChatArtifactItem) => boolean
   /** Called when the user presses the trash icon on an item. */
   onDelete?: (item: ChatArtifactItem) => void
   /** Row ids currently mid-delete — used to disable + fade the icon. */
@@ -140,6 +142,7 @@ export function ArtifactsPanel({
   tab,
   onTabChange,
   artifacts,
+  onSelect,
   onDelete,
   deleting,
   chatbotId,
@@ -344,7 +347,9 @@ export function ArtifactsPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          router.push(artifactHref(artifact, chatbotId))
+                          if (!onSelect?.(artifact)) {
+                            router.push(artifactHref(artifact, chatbotId))
+                          }
                           onOpenChange(false)
                         }}
                         className="flex flex-1 items-start gap-3 text-left"

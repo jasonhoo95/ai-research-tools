@@ -327,6 +327,20 @@ export const chatRepo = {
 		return normalized;
 	},
 
+	/** Replace a saved artifact's content (artifact_chat row id). */
+	async updateArtifact(
+		chatId: string,
+		artifactId: string,
+		content: GeneratedArtifact,
+	): Promise<ArtifactChatRow> {
+		const { data } =
+			await appApi.patch<ArtifactChatRow>(
+				`/chats/${chatId}/artifacts/${artifactId}`,
+				{ content },
+			);
+		return data;
+	},
+
 	async deleteArtifact(
 		chatId: string,
 		artifactId: string,
