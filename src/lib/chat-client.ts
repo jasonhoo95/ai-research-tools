@@ -10,7 +10,8 @@ import type {
 
 export const chatClient = {
   async ask(body: ChatRequestBody): Promise<ChatResponse> {
-    const { data } = await appApi.post<ChatResponse>("/chat", body)
+    // Links in the message (a long YouTube video) can take minutes to read.
+    const { data } = await appApi.post<ChatResponse>("/chat", body, { timeout: 300_000 })
     return data
   },
 

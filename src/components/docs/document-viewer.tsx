@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, ExternalLink, Globe, Loader2 } from "lucide-react"
 
 import {
   HighlightLayer,
@@ -443,6 +443,69 @@ function MediaView({ data, file }: { data: ArrayBuffer; file: ChatFileItem }) {
   )
 }
 
+/**
+ * A document added from a pasted link: its text is indexed for questions,
+ * but only YouTube videos can be shown here (web pages open on their site).
+ */
+function LinkView({ file }: { file: ChatFileItem }) {
+  const url = file.sourceUrl ?? ""
+  const videoId = youtubeId(url)
+  const host = (() => {
+    try {
+      return new URL(url).hostname.replace(/^www\./, "")
+    } catch {
+      return url
+    }
+  })()
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 overflow-auto bg-[#f4f4f5] p-6">
+      {videoId ? (
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${videoId}`}
+          title={file.name}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="aspect-video w-full max-w-3xl rounded-xl bg-black shadow-sm"
+        />
+      ) : (
+        <div className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border bg-background p-8 text-center shadow-sm">
+          <span className="flex size-12 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600">
+            <Globe className="size-6" />
+          </span>
+          <p className="font-semibold">{file.name}</p>
+          <p className="text-sm text-muted-foreground">
+            The text of this page was saved from {host}, so you can ask about it here. Open it
+            on the site to read it.
+          </p>
+        </div>
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+      >
+        <ExternalLink className="size-4" />
+        {videoId ? "Watch on YouTube" : `Open on ${host}`}
+      </a>
+    </div>
+  )
+}
+
+function youtubeId(link: string): string | null {
+  try {
+    const url = new URL(link)
+    const id =
+      url.hostname === "youtu.be"
+        ? url.pathname.slice(1)
+        : (url.searchParams.get("v") ??
+          url.pathname.match(/^\/(?:shorts|live|embed|v)\/([^/?#]+)/)?.[1])
+    return id && /^[A-Za-z0-9_-]{11}$/.test(id) ? id : null
+  } catch {
+    return null
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Viewer
 // -----------------------------------------------------------------------------
@@ -494,6 +557,7 @@ export function DocumentViewer({
     }
   }, [chatId, file.id, file.previewable])
 
+  if (!file.previewable && file.sourceUrl) return <LinkView file={file} />
   if (!file.previewable) {
     return (
       <ViewerMessage error>

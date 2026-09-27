@@ -9,6 +9,7 @@ import type {
 	FileReference,
 	FileSource,
 	GeneratedArtifact,
+	LinkSource,
 	MessageAttachment,
 	SearchProvider,
 } from "@/lib/chat-types";
@@ -56,6 +57,8 @@ export interface MessageContent {
 	fileSources?: FileSource[];
 	/** The passages used, for highlighting in the docs viewer. */
 	fileReferences?: FileReference[];
+	/** Links in the question the answer read. */
+	links?: LinkSource[];
 }
 
 export interface MessageRow {

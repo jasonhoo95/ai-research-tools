@@ -8,13 +8,24 @@ import {
   FileText,
   FileVideo,
   File as FileIcon,
+  Globe,
+  SquarePlay,
   type LucideIcon,
 } from "lucide-react"
 
 import type { MessageAttachment } from "@/lib/chat-types"
 import { cn } from "@/lib/utils"
 
-export type AttachmentKind = "pdf" | "doc" | "image" | "video" | "audio" | "text" | "file"
+export type AttachmentKind =
+  | "pdf"
+  | "doc"
+  | "image"
+  | "video"
+  | "audio"
+  | "text"
+  | "youtube"
+  | "web"
+  | "file"
 
 const KINDS: Record<AttachmentKind, { label: string; icon: LucideIcon; tile: string }> = {
   pdf: { label: "PDF", icon: FileText, tile: "bg-red-500 text-white" },
@@ -23,6 +34,8 @@ const KINDS: Record<AttachmentKind, { label: string; icon: LucideIcon; tile: str
   video: { label: "Video", icon: FileVideo, tile: "bg-violet-500 text-white" },
   audio: { label: "Audio", icon: FileAudio, tile: "bg-amber-500 text-white" },
   text: { label: "Text", icon: FileCode2, tile: "bg-zinc-500 text-white" },
+  youtube: { label: "YouTube", icon: SquarePlay, tile: "bg-red-600 text-white" },
+  web: { label: "Web page", icon: Globe, tile: "bg-sky-500 text-white" },
   file: { label: "File", icon: FileIcon, tile: "bg-zinc-400 text-white" },
 }
 
@@ -30,6 +43,9 @@ const KINDS: Record<AttachmentKind, { label: string; icon: LucideIcon; tile: str
 export function attachmentKind(mime: string, name = ""): AttachmentKind {
   const type = mime.toLowerCase()
   const ext = name.toLowerCase().split(".").pop() ?? ""
+  // Chat files added from pasted links.
+  if (type === "video/youtube") return "youtube"
+  if (type === "text/html") return "web"
   if (type === "application/pdf" || ext === "pdf") return "pdf"
   if (type.includes("wordprocessingml") || ext === "docx" || ext === "doc") return "doc"
   if (type.startsWith("image/")) return "image"

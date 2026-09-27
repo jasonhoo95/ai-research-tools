@@ -1,7 +1,19 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
-import { Bookmark, BookmarkCheck, FileSearch, Pin, StickyNote } from "lucide-react"
+import {
+  Bookmark,
+  BookmarkCheck,
+  CircleAlert,
+  FileSearch,
+  FileText,
+  Globe,
+  Link2,
+  Pin,
+  SquarePlay,
+  StickyNote,
+} from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Markdown } from "@/components/markdown"
 import { cn } from "@/lib/utils"
@@ -10,6 +22,7 @@ import type {
   FileReference,
   FileSource,
   GeneratedArtifact,
+  LinkSource,
   MessageAttachment,
   SearchProvider,
 } from "@/lib/chat-types"
@@ -37,6 +50,8 @@ export interface ChatBubbleMessage {
   fileSources?: FileSource[]
   /** The passages used, for highlighting in the docs viewer. */
   fileReferences?: FileReference[]
+  /** Links in the question the answer read (or couldn't). */
+  links?: LinkSource[]
   /** ISO timestamp — drives the day separators in the message list. */
   createdAt?: string
   /** Pinned to the chat's side panel. */
@@ -73,9 +88,12 @@ export function MessageBubble({
   pinState,
   chatbotId,
   onFileSourceClick,
+  typingLabel,
 }: {
   message: ChatBubbleMessage
   typing?: boolean
+  /** Shown next to the typing dots, e.g. "Reading the link…". */
+  typingLabel?: string
   /** When present, the artifact card renders a save/pin button. */
   artifactSaveState?: ArtifactSaveState
   /** When present, renders an add-to-notes button on the bubble. */
@@ -147,11 +165,18 @@ export function MessageBubble({
               </button>
             ) : null}
             {typing ? (
-              <TypingDots />
+              typingLabel ? (
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <TypingDots />
+                  <span className="text-xs">{typingLabel}</span>
+                </span>
+              ) : (
+                <TypingDots />
+              )
             ) : (
               <>
                 {isUser ? (
-                  message.content
+                  <LinkifiedText text={message.content} />
                 ) : (
                   <Markdown>
                     {message.sources?.length
@@ -166,6 +191,7 @@ export function MessageBubble({
                     chatbotId={chatbotId}
                   />
                 )}
+                {!isUser && message.links?.length ? <LinkSources links={message.links} /> : null}
                 {!isUser && message.fileSources?.length ? (
                 <FileSources sources={message.fileSources} onSelect={onFileSourceClick} />
               ) : null}
@@ -309,6 +335,93 @@ export function TypingDots() {
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
     </span>
+  )
+}
+
+const URL_IN_TEXT = /(https?:\/\/[^\s<>"'`]+)/g
+
+/** Plain text with its URLs clickable (user messages). */
+function LinkifiedText({ text }: { text: string }) {
+  const parts = text.split(URL_IN_TEXT)
+  if (parts.length === 1) return <>{text}</>
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <a
+            key={i}
+            href={part.replace(/[.,;:!?)]+$/, "")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="break-all underline underline-offset-2 opacity-90 hover:opacity-100"
+          >
+            {part}
+          </a>
+        ) : (
+          <React.Fragment key={i}>{part}</React.Fragment>
+        ),
+      )}
+    </>
+  )
+}
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return url
+  }
+}
+
+/** The links an answer read from, or couldn't open (with why). */
+function LinkSources({ links }: { links: LinkSource[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <Link2 className="size-3.5 shrink-0" aria-hidden />
+      <span>{links.length === 1 ? "Read from link:" : "Read from links:"}</span>
+      {links.map((link) => {
+        const Icon = link.error
+          ? CircleAlert
+          : link.kind === "youtube"
+            ? SquarePlay
+            : link.kind === "pdf"
+              ? FileText
+              : Globe
+        const label = link.title || hostOf(link.url)
+        return (
+          <a
+            key={link.url}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={
+              link.error
+                ? `Couldn't open ${link.url}: ${link.error}`
+                : [label, link.siteName, link.truncated ? "Very long — only the start was read" : "", link.url]
+                    .filter(Boolean)
+                    .join("\n")
+            }
+            className={cn(
+              "inline-flex max-w-64 items-center gap-1 rounded-full border px-2 py-0.5 transition-colors",
+              link.error
+                ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                : "bg-background/70 text-foreground hover:border-[#f97316]/50 hover:bg-[#f97316]/10",
+            )}
+          >
+            <Icon
+              className={cn(
+                "size-3.5 shrink-0",
+                !link.error && link.kind === "youtube" && "text-red-600",
+                !link.error && link.kind === "pdf" && "text-red-500",
+                !link.error && link.kind === "web" && "text-sky-600",
+              )}
+            />
+            <span className="truncate">{label}</span>
+            {link.error ? <span className="shrink-0">· couldn&apos;t open</span> : null}
+          </a>
+        )
+      })}
+    </div>
   )
 }
 

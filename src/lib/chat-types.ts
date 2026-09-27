@@ -43,6 +43,22 @@ export interface ChatFileItem {
 	createdAt: string;
 	/** The original is stored, so it can be previewed. */
 	previewable: boolean;
+	/** Added from a pasted link (web page, YouTube video, linked PDF). */
+	sourceUrl?: string;
+}
+
+/** A link in the user's message, as read for the answer. */
+export interface LinkSource {
+	url: string;
+	kind: "youtube" | "web" | "pdf";
+	title?: string;
+	siteName?: string;
+	/** Why it couldn't be opened. */
+	error?: string;
+	/** Only the start of a very long page was read. */
+	truncated?: boolean;
+	/** The chat file it was saved as, for follow-up questions. */
+	fileId?: string;
 }
 
 /** A file (and its pages) an answer was drawn from. */
@@ -288,6 +304,8 @@ export interface ChatResponse {
 	fileSources?: FileSource[];
 	/** The passages used, best match first. */
 	fileReferences?: FileReference[];
+	/** Links in the message that were read (or couldn't be). */
+	links?: LinkSource[];
 }
 
 /** A file sent with a chat message. */

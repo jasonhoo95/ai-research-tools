@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
     const upstream = await api.post("/chat", body, {
       headers: headersFromIncoming(request.headers),
       validateStatus: proxyValidateStatus,
+      // Reading links in the message (a long YouTube video) can take minutes.
+      timeout: 300_000,
     })
 
     return NextResponse.json(upstream.data, { status: upstream.status })

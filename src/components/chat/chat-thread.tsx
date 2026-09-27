@@ -82,7 +82,13 @@ function contentToBubble(row: {
     searchProvider: row.content.searchProvider,
     fileSources: row.content.fileSources,
     fileReferences: row.content.fileReferences,
+    links: row.content.links,
   }
+}
+
+/** Links in a message, like the backend finds them (for the waiting label). */
+function countLinks(text: string) {
+  return new Set(text.match(/\bhttps?:\/\/[^\s<>"'`]+|\bwww\.[a-z0-9-]+\.[a-z]/gi) ?? []).size
 }
 
 const PAGE_SIZE = 30
@@ -126,6 +132,8 @@ export interface ChatThreadProps {
   onArtifactsChange?: (rows: ArtifactChatRow[]) => void
   /** An artifact in the side panel was clicked; return true when handled. */
   onArtifactSelect?: (item: ChatArtifactItem) => boolean
+  /** Links in a question were saved as chat files (docs: new documents). */
+  onLinksSaved?: () => void
   /** Shown above the composer (docs: which documents questions are about). */
   composerAccessory?: React.ReactNode
   /** Composer placeholder when nothing is attached. */
@@ -159,6 +167,7 @@ export function ChatThread({
   handleRef,
   onArtifactsChange,
   onArtifactSelect,
+  onLinksSaved,
   composerAccessory,
   composerPlaceholder,
   emptyState,
@@ -173,6 +182,8 @@ export function ChatThread({
   const [chat, setChat] = React.useState<ChatRow | null>(null)
   const [messages, setMessages] = React.useState<ChatBubbleMessage[]>([])
   const [pending, setPending] = React.useState(false)
+  /** What the pending answer is doing, e.g. reading links. */
+  const [pendingLabel, setPendingLabel] = React.useState<string | undefined>()
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [notFound, setNotFound] = React.useState(false)
@@ -538,6 +549,10 @@ export function ChatThread({
     }
     setMessages((prev) => [...prev, optimisticUser])
     setPending(true)
+    const linkCount = countLinks(value)
+    setPendingLabel(
+      linkCount ? (linkCount === 1 ? "Reading the link…" : `Reading ${linkCount} links…`) : undefined,
+    )
     setScrollTarget({ kind: "bottom", smooth: true })
 
     try {
@@ -605,7 +620,9 @@ export function ChatThread({
         searchProvider: data.searchProvider,
         fileSources: data.fileSources?.length ? data.fileSources : undefined,
         fileReferences: data.fileReferences?.length ? data.fileReferences : undefined,
+        links: data.links?.length ? data.links : undefined,
       }
+      if (data.links?.some((link) => link.fileId)) onLinksSaved?.()
       const savedAssistant = await chatRepo.appendMessage(chatId, assistantContent)
 
       setMessages((prev) => [
@@ -620,6 +637,7 @@ export function ChatThread({
           searchProvider: assistantContent.searchProvider,
           fileSources: assistantContent.fileSources,
           fileReferences: assistantContent.fileReferences,
+          links: assistantContent.links,
         },
       ])
       setScrollTarget({ kind: "bottom", smooth: true })
@@ -982,6 +1000,7 @@ export function ChatThread({
               <MessageBubble
                 message={{ id: "typing", role: "assistant", content: "" }}
                 typing
+                typingLabel={pendingLabel}
               />
             )}
             {error && (

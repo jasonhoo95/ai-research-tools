@@ -21,6 +21,14 @@ export type UploadItem = {
   error?: string
 }
 
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return url
+  }
+}
+
 export const DOCUMENT_ACCEPT =
   "application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/plain,.txt,.md"
 
@@ -130,8 +138,9 @@ export function DocumentsPanel({
                   <span className="block truncate text-sm font-medium" title={file.name}>
                     {file.name}
                   </span>
-                  <span className="block text-xs text-muted-foreground">
-                    {attachmentLabel(kind)} · {humanBytes(file.sizeBytes)}
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {attachmentLabel(kind)} ·{" "}
+                    {file.sourceUrl && kind !== "pdf" ? hostOf(file.sourceUrl) : humanBytes(file.sizeBytes)}
                   </span>
                 </span>
                 {highlighted > 0 ? (

@@ -284,6 +284,17 @@ export default function DocsWorkspacePage() {
     setSheetOpen(false)
   }
 
+  // Links pasted in a question become documents: show them.
+  const refreshFiles = React.useCallback(() => {
+    chatRepo
+      .listFiles(chatId)
+      .then((list) => {
+        setFiles(list)
+        setActiveFileId((current) => current ?? list.at(-1)?.id ?? null)
+      })
+      .catch(() => {})
+  }, [chatId])
+
   const openFileByName = (fileName: string) => {
     const file = files.find((f) => f.name === fileName)
     if (file) setActiveFileId(file.id)
@@ -475,6 +486,7 @@ export default function DocsWorkspacePage() {
           onArtifactsChange={onArtifactsChange}
           onArtifactSelect={selectArtifact}
           onFileSourceSelect={openFileByName}
+          onLinksSaved={refreshFiles}
           reservePanelSpace={false}
           onPanelOpenChange={setPanelOpen}
           composerPlaceholder={
