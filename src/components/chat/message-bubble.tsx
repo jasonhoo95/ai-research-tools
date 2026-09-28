@@ -6,9 +6,11 @@ import {
   Bookmark,
   BookmarkCheck,
   CircleAlert,
+  EllipsisVertical,
   FileText,
   Globe,
   Link2,
+  Loader2,
   Pin,
   SquarePlay,
   StickyNote,
@@ -28,6 +30,18 @@ import type {
 import { MessageAttachments } from "@/components/chat/attachments"
 import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-labels"
 import { Citations, linkifyCitations } from "@/components/chat/citations"
+import {
+  KIND_OPTIONS,
+  type CreatableArtifactKind,
+} from "@/components/chat/create-artifact-menu"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export type MessageRole = "user" | "assistant"
 
@@ -71,6 +85,13 @@ export interface MessagePinState {
   onToggle: () => void
 }
 
+/** Create an artifact from an answer (the ⋮ menu on AI messages). */
+export interface MessageCreateArtifactState {
+  /** The kind being generated from this message, if any. */
+  pending: CreatableArtifactKind | null
+  onCreate: (kind: CreatableArtifactKind) => void
+}
+
 export interface MessageNoteState {
   saved: boolean
   saving: boolean
@@ -85,6 +106,7 @@ export function MessageBubble({
   artifactSaveState,
   noteState,
   pinState,
+  createArtifactState,
   chatbotId,
   typingLabel,
 }: {
@@ -98,6 +120,8 @@ export function MessageBubble({
   noteState?: MessageNoteState
   /** When present, assistant bubbles get a hover pin button (top right). */
   pinState?: MessagePinState
+  /** When present, AI messages get a ⋮ menu to create an artifact from them. */
+  createArtifactState?: MessageCreateArtifactState
   /** Parent chatbot id, used to build the artifact detail URL. */
   chatbotId?: string
 }) {
@@ -159,6 +183,12 @@ export function MessageBubble({
               >
                 <Pin className={cn("size-3.5 transition-transform", pinState.pinned && "rotate-45 fill-current")} />
               </button>
+            ) : null}
+            {createArtifactState && !isUser && !typing && !message.artifact && message.content.trim() ? (
+              <MessageArtifactMenu
+                state={createArtifactState}
+                className={pinState ? "top-8" : "top-0"}
+              />
             ) : null}
             {typing ? (
               typingLabel ? (
@@ -328,6 +358,62 @@ export function TypingDots() {
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
       <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
     </span>
+  )
+}
+
+/** ⋮ next to an AI message: create an artifact from what it says. */
+function MessageArtifactMenu({
+  state,
+  className,
+}: {
+  state: MessageCreateArtifactState
+  className?: string
+}) {
+  const pending = state.pending
+    ? KIND_OPTIONS.find((option) => option.kind === state.pending)
+    : undefined
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={Boolean(pending)}
+        aria-label={pending ? `Creating ${pending.label.toLowerCase()}…` : "Create artifact from this message"}
+        title={pending ? `Creating ${pending.label.toLowerCase()}…` : "Create artifact from this message"}
+        className={cn(
+          // Under the pin, just outside the bubble's top-right corner.
+          "absolute -right-9 flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-[opacity,color,background-color] hover:bg-muted hover:text-foreground focus-visible:opacity-100 data-popup-open:bg-muted data-popup-open:text-foreground data-popup-open:opacity-100",
+          pending ? "opacity-100" : "opacity-0 group-hover/message:opacity-100",
+          className,
+        )}
+      >
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin text-[#f97316]" />
+        ) : (
+          <EllipsisVertical className="size-3.5" />
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="right" sideOffset={4} className="w-60 p-1.5">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-2 pb-1.5">Create from this message</DropdownMenuLabel>
+          {KIND_OPTIONS.map((option) => (
+            <DropdownMenuItem
+              key={option.kind}
+              onClick={() => state.onCreate(option.kind)}
+              className="gap-2.5 rounded-lg px-2 py-1.5"
+            >
+              <span
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-md",
+                  option.tint,
+                )}
+              >
+                <option.icon className="size-3.5" />
+              </span>
+              <span className="text-sm">{option.label}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

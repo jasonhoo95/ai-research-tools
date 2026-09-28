@@ -20,6 +20,7 @@ import type {
   FileChatResponse,
   GeneratedArtifact,
 } from "@/lib/chat-types"
+import { artifactKindLabel } from "@/lib/artifact-labels"
 import { artifactsStore } from "@/lib/artifacts-store"
 import { normalizeGeneratedArtifact } from "@/lib/artifact-chat-row"
 import {
@@ -37,6 +38,7 @@ import { DateSeparator, dayKey } from "@/components/chat/date-separator"
 import { MessageSearch } from "@/components/chat/message-search"
 import {
   CreateArtifactMenu,
+  type CreatableArtifactKind,
   type CreateArtifactInput,
 } from "@/components/chat/create-artifact-menu"
 import {
@@ -743,6 +745,36 @@ export function ChatThread({
     }
   }
 
+  /** Messages generating an artifact from their ⋮ menu, and which kind. */
+  const [creatingFrom, setCreatingFrom] = React.useState<
+    ReadonlyMap<string, CreatableArtifactKind>
+  >(new Map())
+
+  /** ⋮ menu on an AI message: make an artifact of `kind` from its answer. */
+  const handleCreateFromMessage = async (
+    message: ChatBubbleMessage,
+    kind: CreatableArtifactKind,
+  ) => {
+    if (creatingFrom.has(message.id)) return
+    setCreatingFrom((prev) => new Map(prev).set(message.id, kind))
+    try {
+      await handleCreateArtifact({
+        kind,
+        title: "",
+        // Within the backend's prompt limit.
+        prompt: `Create a ${artifactKindLabel(kind).toLowerCase()} from this answer. Use it as the source material.\n\n${message.content.slice(0, 18_000)}`,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the artifact.")
+    } finally {
+      setCreatingFrom((prev) => {
+        const next = new Map(prev)
+        next.delete(message.id)
+        return next
+      })
+    }
+  }
+
   const handleSaveArtifact = async (content: GeneratedArtifact) => {
     if (!chatId) return
     try {
@@ -979,6 +1011,10 @@ export function ChatThread({
                         { id: m.id, text: m.content, createdAt: m.createdAt },
                         !m.pinned,
                       ),
+                  }}
+                  createArtifactState={{
+                    pending: creatingFrom.get(m.id) ?? null,
+                    onCreate: (kind) => void handleCreateFromMessage(m, kind),
                   }}
                   chatbotId={chatId}
                 />

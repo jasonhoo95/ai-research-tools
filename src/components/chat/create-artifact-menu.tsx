@@ -40,7 +40,7 @@ import type { ArtifactKind } from "@/lib/chat-types"
 /** Kinds the backend can generate from a prompt. */
 export type CreatableArtifactKind = Exclude<ArtifactKind, "notes" | "highlight">
 
-type KindOption = {
+export type KindOption = {
   kind: CreatableArtifactKind
   label: string
   description: string
@@ -49,7 +49,7 @@ type KindOption = {
   placeholder: string
 }
 
-const KIND_OPTIONS: KindOption[] = [
+export const KIND_OPTIONS: KindOption[] = [
   {
     kind: "slide",
     label: "Slide deck",
