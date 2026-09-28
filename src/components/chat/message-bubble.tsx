@@ -373,12 +373,15 @@ const hostOf = (url: string) => {
   }
 }
 
-/** The links an answer read from, or couldn't open (with why). */
+/**
+ * The links in the question. Ones a site blocked were answered from web
+ * search (its sources show below); older answers may carry an error.
+ */
 function LinkSources({ links }: { links: LinkSource[] }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
       <Link2 className="size-3.5 shrink-0" aria-hidden />
-      <span>{links.length === 1 ? "Read from link:" : "Read from links:"}</span>
+      <span>{links.length === 1 ? "Link:" : "Links:"}</span>
       {links.map((link) => {
         const Icon = link.error
           ? CircleAlert
