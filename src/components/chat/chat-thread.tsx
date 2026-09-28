@@ -124,8 +124,6 @@ export interface ChatThreadProps {
   fileIds?: string[]
   /** Docs: add attached files to the workspace; resolves to the new file ids. */
   onAddDocuments?: (files: File[]) => Promise<string[]>
-  /** Docs: one of an answer's source documents was clicked. */
-  onFileSourceSelect?: (fileName: string) => void
   /** Lets the page add, replace or remove artifacts it saved itself. */
   handleRef?: React.Ref<ChatThreadHandle>
   /** The chat's saved artifacts, whenever they change. */
@@ -163,7 +161,6 @@ export function ChatThread({
   variant = "chat",
   fileIds,
   onAddDocuments,
-  onFileSourceSelect,
   handleRef,
   onArtifactsChange,
   onArtifactSelect,
@@ -984,7 +981,6 @@ export function ChatThread({
                       ),
                   }}
                   chatbotId={chatId}
-                  onFileSourceClick={isDocs ? onFileSourceSelect : undefined}
                 />
                 </div>
                 </React.Fragment>

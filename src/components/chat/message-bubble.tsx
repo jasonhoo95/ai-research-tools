@@ -6,7 +6,6 @@ import {
   Bookmark,
   BookmarkCheck,
   CircleAlert,
-  FileSearch,
   FileText,
   Globe,
   Link2,
@@ -87,7 +86,6 @@ export function MessageBubble({
   noteState,
   pinState,
   chatbotId,
-  onFileSourceClick,
   typingLabel,
 }: {
   message: ChatBubbleMessage
@@ -102,8 +100,6 @@ export function MessageBubble({
   pinState?: MessagePinState
   /** Parent chatbot id, used to build the artifact detail URL. */
   chatbotId?: string
-  /** Makes the "From your files" chips open that file's passages. */
-  onFileSourceClick?: (fileName: string) => void
 }) {
   const isUser = message.role === "user"
   const attachments =
@@ -192,9 +188,6 @@ export function MessageBubble({
                   />
                 )}
                 {!isUser && message.links?.length ? <LinkSources links={message.links} /> : null}
-                {!isUser && message.fileSources?.length ? (
-                <FileSources sources={message.fileSources} onSelect={onFileSourceClick} />
-              ) : null}
               {!isUser && message.sources?.length ? (
                   <Citations
                     sources={message.sources}
@@ -428,48 +421,3 @@ function LinkSources({ links }: { links: LinkSource[] }) {
   )
 }
 
-/** "From your files" line under an answer that used uploaded files. */
-function FileSources({
-  sources,
-  onSelect,
-}: {
-  sources: FileSource[]
-  /** Makes each chip a button that opens that file's passages. */
-  onSelect?: (fileName: string) => void
-}) {
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-      <FileSearch className="size-3.5 shrink-0" aria-hidden />
-      <span>From your files:</span>
-      {sources.map((source) => {
-        const label = (
-          <>
-            <span className="truncate">{source.fileName}</span>
-            {source.pages.length ? (
-              <span className="shrink-0 text-muted-foreground">
-                · p. {source.pages.join(", ")}
-              </span>
-            ) : null}
-          </>
-        )
-        const chip =
-          "inline-flex max-w-60 items-center gap-1 rounded-full border bg-background/70 px-2 py-0.5 text-foreground"
-        return onSelect ? (
-          <button
-            key={source.fileName}
-            type="button"
-            title={`Show where in ${source.fileName}`}
-            onClick={() => onSelect(source.fileName)}
-            className={cn(chip, "transition-colors hover:border-[#f97316]/50 hover:bg-[#f97316]/10")}
-          >
-            {label}
-          </button>
-        ) : (
-          <span key={source.fileName} className={chip} title={source.fileName}>
-            {label}
-          </span>
-        )
-      })}
-    </div>
-  )
-}

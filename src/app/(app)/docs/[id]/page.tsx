@@ -295,12 +295,6 @@ export default function DocsWorkspacePage() {
       .catch(() => {})
   }, [chatId])
 
-  const openFileByName = (fileName: string) => {
-    const file = files.find((f) => f.name === fileName)
-    if (file) setActiveFileId(file.id)
-    else setNotice(`${fileName} is no longer in this workspace.`)
-  }
-
   const deleteDocument = async (file: ChatFileItem) => {
     try {
       await chatRepo.deleteFile(chatId, file.id)
@@ -485,7 +479,6 @@ export default function DocsWorkspacePage() {
           handleRef={threadRef}
           onArtifactsChange={onArtifactsChange}
           onArtifactSelect={selectArtifact}
-          onFileSourceSelect={openFileByName}
           onLinksSaved={refreshFiles}
           reservePanelSpace={false}
           onPanelOpenChange={setPanelOpen}
