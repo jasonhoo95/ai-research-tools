@@ -1,4 +1,4 @@
-import type { NextResponse } from "next/server"
+import type { NextRequest, NextResponse } from "next/server"
 
 /**
  * Session cookies. Tokens live in httpOnly cookies so page scripts can't read
@@ -100,4 +100,21 @@ export function readCookie(header: string | null, name: string): string | undefi
     }
   }
   return undefined
+}
+
+const HOST_PATTERN = /^[a-z0-9.-]+(:\d+)?$/i
+
+/**
+ * The origin the browser is using, e.g. an ngrok URL. Behind a proxy or
+ * tunnel `request.nextUrl.origin` is the dev server's own (localhost:3000),
+ * so redirects built from it would leave the tunnel. The backend only
+ * accepts allowlisted origins for login redirects, so a forged header can't
+ * send a login anywhere else.
+ */
+export function publicOrigin(request: NextRequest): string {
+  const first = (name: string) => request.headers.get(name)?.split(",")[0]?.trim()
+  const host = first("x-forwarded-host") || first("host")
+  if (!host || !HOST_PATTERN.test(host)) return request.nextUrl.origin
+  const proto = first("x-forwarded-proto") || request.nextUrl.protocol.replace(/:$/, "")
+  return `${proto === "https" ? "https" : "http"}://${host}`
 }

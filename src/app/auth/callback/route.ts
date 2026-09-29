@@ -5,6 +5,7 @@ import {
   NEXT_COOKIE,
   PKCE_COOKIE,
   clearSessionCookies,
+  publicOrigin,
   safeNextPath,
   setSessionCookies,
   type AuthSession,
@@ -16,7 +17,8 @@ import {
  * httpOnly cookies, and continue to the page the user wanted.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl
+  const { searchParams } = request.nextUrl
+  const origin = publicOrigin(request)
   const failure = (message: string) => {
     const url = new URL("/login", origin)
     url.searchParams.set("error", message)
