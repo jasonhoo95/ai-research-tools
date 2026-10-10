@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation"
 import { MessageSquare, Trash2 } from "lucide-react"
 
 import { NewChatDialog, type NewChatValues } from "@/components/chat/new-chat-dialog"
-import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
-import { useChatThreadStore } from "@/store/chat-thread-store"
+import { chatRepo, isPlainChat } from "@/lib/chat-repo"
+import { THREAD_FRESH_MS, useChatThreadStore } from "@/store/chat-thread-store"
 
 function formatRelative(iso: string) {
   const d = new Date(iso)
@@ -25,19 +25,28 @@ function formatRelative(iso: string) {
 
 export default function ChatListPage() {
   const router = useRouter()
-  const [chats, setChats] = React.useState<ChatRow[] | null>(null)
+  // The saved list shows at once; null until it has been loaded once.
+  const chatList = useChatThreadStore((s) => s.chatList)
+  const chats = React.useMemo(
+    () => chatList?.rows.filter(isPlainChat) ?? null,
+    [chatList],
+  )
   const [error, setError] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
 
+  // Load the list unless the saved one is recent; an older one stays on
+  // screen while it's refreshed.
   React.useEffect(() => {
+    const { chatList: saved, saveChatList } = useChatThreadStore.getState()
+    if (saved && Date.now() - saved.fetchedAt < THREAD_FRESH_MS) return
     let alive = true
     chatRepo
       .listChats()
       .then((rows) => {
-        if (alive) setChats(rows.filter(isPlainChat))
+        if (alive) saveChatList(rows)
       })
       .catch((err: Error) => {
-        if (alive) setError(err.message)
+        if (alive && !saved) setError(err.message)
       })
     return () => {
       alive = false
@@ -47,6 +56,7 @@ export default function ChatListPage() {
   const handleCreate = async (values: NewChatValues) => {
     try {
       const row = await chatRepo.createChat(values)
+      useChatThreadStore.getState().upsertChat(row)
       setDialogOpen(false)
       router.push(`/chat/${row.id}`)
     } catch (err) {
@@ -59,7 +69,6 @@ export default function ChatListPage() {
     try {
       await chatRepo.deleteChat(id)
       useChatThreadStore.getState().remove(id)
-      setChats((prev) => (prev ? prev.filter((c) => c.id !== id) : prev))
     } catch (err) {
       setError((err as Error).message)
     }

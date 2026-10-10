@@ -652,6 +652,8 @@ export function ChatThread({
     try {
       const savedUser = await chatRepo.appendMessage(chatId, userContent)
       userMsgId = savedUser.id
+      // The backend marks the chat updated; so does the saved chat list.
+      useChatThreadStore.getState().touchChat(chatId, savedUser.created_at)
       setMessages((prev) =>
         prev.map((m) =>
           m.id === optimisticUser.id

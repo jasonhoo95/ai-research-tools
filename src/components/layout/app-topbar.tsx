@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react"
 import { NewChatDialog, type NewChatValues } from "@/components/chat/new-chat-dialog"
 import { OnboardingReplayButton } from "@/components/onboarding/onboarding-replay-button"
 import { chatRepo } from "@/lib/chat-repo"
+import { useChatThreadStore } from "@/store/chat-thread-store"
 import { cn } from "@/lib/utils"
 
 type Crumb = { label: string; href?: string }
@@ -72,6 +73,7 @@ export function AppTopbar() {
 
   const handleCreate = async (values: NewChatValues) => {
     const row = await chatRepo.createChat(values)
+    useChatThreadStore.getState().upsertChat(row)
     setDialogOpen(false)
     router.push(`/chat/${row.id}`)
   }

@@ -8,6 +8,7 @@ import { FileSearch, Loader2, Upload } from "lucide-react"
 import { DOCUMENT_ACCEPT } from "@/components/docs/documents-panel"
 import { chatRepo, type ChatRow } from "@/lib/chat-repo"
 import { setPendingUploads } from "@/lib/pending-uploads"
+import { useChatThreadStore } from "@/store/chat-thread-store"
 import { cn } from "@/lib/utils"
 
 /** A workspace title from its first document, e.g. "Annual report 2024". */
@@ -43,6 +44,7 @@ export default function DocsPage() {
     setError(null)
     try {
       const chat = await chatRepo.createChat({ title: titleFrom(files), kind: "docs" })
+      useChatThreadStore.getState().upsertChat(chat)
       // The workspace page uploads them, showing progress.
       setPendingUploads(chat.id, files)
       router.push(`/docs/${chat.id}`)
