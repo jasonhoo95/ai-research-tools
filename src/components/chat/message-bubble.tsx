@@ -167,6 +167,7 @@ export function MessageBubble({
             {pinState && !isUser && !typing ? (
               <button
                 type="button"
+                data-tour="pin-message"
                 onClick={pinState.onToggle}
                 disabled={pinState.pending}
                 aria-pressed={pinState.pinned}

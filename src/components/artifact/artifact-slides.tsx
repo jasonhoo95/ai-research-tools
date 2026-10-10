@@ -503,12 +503,12 @@ export function ArtifactSlides({
   const togglePresent = () => {
     if (presenting) {
       setPresenting(false)
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => { })
       return
     }
     setPresenting(true)
     wakeControls()
-    stageRef.current?.requestFullscreen?.().catch(() => {})
+    stageRef.current?.requestFullscreen?.().catch(() => { })
   }
 
   // Keep the active thumbnail in view as the deck advances.
@@ -524,7 +524,7 @@ export function ArtifactSlides({
   const layout = layoutFor(index)
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
+    <div className="flex flex-col gap-4 lg:flex-row border border-border rounded-lg p-4">
       {/* Filmstrip */}
       <nav
         aria-label="Slides"
@@ -650,7 +650,7 @@ export function ArtifactSlides({
           className={cn(
             "relative",
             presenting &&
-              "fixed inset-0 z-[100] flex items-center justify-center bg-black",
+            "fixed inset-0 z-[100] flex items-center justify-center bg-black",
           )}
         >
           <div
@@ -733,15 +733,7 @@ export function ArtifactSlides({
           )}
         </div>
 
-        {/* Speaker notes */}
-        {slide.notes && (
-          <div className="rounded-lg border bg-muted/30 px-4 py-3">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Speaker notes
-            </div>
-            <p className="text-sm leading-relaxed text-foreground/80">{slide.notes}</p>
-          </div>
-        )}
+
       </div>
     </div>
   )

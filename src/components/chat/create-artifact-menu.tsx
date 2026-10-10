@@ -163,6 +163,7 @@ export function CreateArtifactMenu({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
+          data-tour="create-artifact"
           aria-label="Create artifact"
           title="Create artifact"
           className="flex size-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground data-popup-open:bg-muted data-popup-open:text-foreground"

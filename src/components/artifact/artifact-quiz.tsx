@@ -531,16 +531,27 @@ export function ArtifactQuiz({
       <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-6 shadow-sm sm:p-8 dark:from-sky-500/10 dark:via-background dark:to-indigo-500/10">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0 flex-1 space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-400">
-              Study material
-            </span>
-            <InlineInput
-              value={title}
-              onChange={(title) => commit((prev) => ({ ...prev, title }))}
-              placeholder="Quiz title"
-              label="Quiz title"
-              className="text-2xl font-bold tracking-tight"
-            />
+            <div className="flex items-center justify-between gap-2">
+
+              <InlineInput
+                value={title}
+                onChange={(title) => commit((prev) => ({ ...prev, title }))}
+                placeholder="Quiz title"
+                label="Quiz title"
+                className="text-2xl font-bold tracking-tight"
+              />
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => setPlaying(true)}
+                disabled={playable.length === 0}
+                className="h-12 shrink-0 gap-2 rounded-full px-7 text-base shadow-md"
+              >
+                <Play className="size-4 fill-current" />
+                Start quiz
+              </Button>
+            </div>
+
             <InlineInput
               value={quiz.description ?? ""}
               onChange={(description) => commit((prev) => ({ ...prev, description }))}
@@ -569,16 +580,7 @@ export function ArtifactQuiz({
               ))}
             </div>
           </div>
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => setPlaying(true)}
-            disabled={playable.length === 0}
-            className="h-12 shrink-0 gap-2 rounded-full px-7 text-base shadow-md"
-          >
-            <Play className="size-4 fill-current" />
-            Start quiz
-          </Button>
+
         </div>
       </section>
 
@@ -596,43 +598,45 @@ export function ArtifactQuiz({
         </Button>
       </div>
 
-      <DndContext
-        id={dndId}
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-        onDragStart={handleDragStart}
-        onDragCancel={handleDragCancel}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={quiz.questions.map((q) => q.id)}
-          strategy={verticalListSortingStrategy}
+      <div>
+        <DndContext
+          id={dndId}
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+          onDragStart={handleDragStart}
+          onDragCancel={handleDragCancel}
+          onDragEnd={handleDragEnd}
         >
-          <ol className={cn("grid", reordering ? "gap-2" : "gap-4")}>
-            {quiz.questions.map((question, index) => (
-              <QuestionCard
-                key={question.id}
-                question={question}
-                number={index + 1}
-                compact={reordering}
-                onChange={(patch) => updateQuestion(question.id, patch)}
-                onDelete={() => deleteQuestion(question.id)}
-                onGripPointerDown={() => handleGripPointerDown(question.id)}
-              />
-            ))}
-          </ol>
-        </SortableContext>
-      </DndContext>
+          <SortableContext
+            items={quiz.questions.map((q) => q.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ol className={cn("grid", reordering ? "gap-2" : "gap-4")}>
+              {quiz.questions.map((question, index) => (
+                <QuestionCard
+                  key={question.id}
+                  question={question}
+                  number={index + 1}
+                  compact={reordering}
+                  onChange={(patch) => updateQuestion(question.id, patch)}
+                  onDelete={() => deleteQuestion(question.id)}
+                  onGripPointerDown={() => handleGripPointerDown(question.id)}
+                />
+              ))}
+            </ol>
+          </SortableContext>
+        </DndContext>
 
-      <button
-        type="button"
-        onClick={addQuestion}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
-      >
-        <Plus className="size-4" />
-        Add question
-      </button>
+        <button
+          type="button"
+          onClick={addQuestion}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40 hover:text-foreground"
+        >
+          <Plus className="size-4" />
+          Add question
+        </button>
+      </div>
 
       {playing ? (
         <QuizPlayer

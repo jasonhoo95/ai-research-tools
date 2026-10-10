@@ -128,8 +128,10 @@ function SortableHeader({
                 'crm-table-head group/col relative',
                 isDragging && 'z-20 bg-white opacity-80 shadow-lg',
             )}>
-            <div className='flex items-center gap-1'>
-                <button
+            <div className={cn('flex items-center gap-1', isDragging && 'z-20 cursor-grabbing')}
+                {...attributes}
+                {...listeners}>
+                {/* <button
                     type='button'
                     ref={setActivatorNodeRef}
                     aria-label={`Drag to reorder ${column.label}`}
@@ -137,15 +139,12 @@ function SortableHeader({
                     {...attributes}
                     {...listeners}>
                     <GripVertical className='size-3.5' />
-                </button>
-                <div className='min-w-0'>{label}</div>
-                {sortDirection ? (
-                    <span
-                        className='shrink-0 text-[#f97316]'
-                        aria-label={`Sorted ${sortDirection === 'asc' ? 'ascending' : 'descending'}`}>
-                        {sortDirection === 'asc' ? <ArrowUp className='size-3' /> : <ArrowDown className='size-3' />}
-                    </span>
-                ) : null}
+                </button> */}
+
+                {isDragging ? <div>{column.label}</div> : (
+                    <div className='min-w-0'>{label}</div>
+                )}
+
                 <DropdownMenu>
                     <DropdownMenuTrigger
                         aria-label={`${column.label} column options`}

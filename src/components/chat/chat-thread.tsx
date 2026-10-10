@@ -907,151 +907,151 @@ export function ChatThread({
         style={{ paddingRight: reservePanelSpace && artifactsOpen ? 360 : 0 }}
       >
         <div className="relative flex min-h-0 flex-1 flex-col">
-        {chatId && (
-          <div className="absolute right-4 top-3 z-20 flex items-center gap-2">
-            <CreateArtifactMenu onCreate={handleCreateArtifact} />
-            <Tooltip>
-              <TooltipTrigger
-                onClick={togglePinnedPanel}
-                aria-label={`Pinned messages (${pinnedMessages.length})`}
-                aria-pressed={artifactsOpen && panelTab === "pinned"}
-                className={cn(
-                  "relative flex size-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground",
-                  artifactsOpen && panelTab === "pinned" && "bg-muted text-foreground",
-                )}
-              >
-                <Pin className="size-4" />
-                {pinnedMessages.length > 0 ? (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
-                    {pinnedMessages.length > 99 ? "99+" : pinnedMessages.length}
-                  </span>
-                ) : null}
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="z-50">
-                {pinnedMessages.length === 0
-                  ? "No pinned messages"
-                  : `${pinnedMessages.length} pinned message${pinnedMessages.length === 1 ? "" : "s"}`}
-              </TooltipContent>
-            </Tooltip>
-            <MessageSearch chatId={chatId} onSelect={jumpToMessage} />
-          </div>
-        )}
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto [overflow-anchor:none]"
-        >
-          <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-8">
-            <div ref={topSentinelRef} aria-hidden className="h-px" />
-            {loadingOlder && (
-              <div className="flex justify-center text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-              </div>
-            )}
-            {!hasMoreBefore && chat?.description && (
-              <p className="text-sm text-[#71717a]">{chat.description}</p>
-            )}
-            {messages.length === 0 && !pending && (
-              emptyState ?? (
-                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                  Send your first message to get things started.
-                </div>
-              )
-            )}
-            {messages.map((m, i) => {
-              const prevCreated = messages[i - 1]?.createdAt
-              const showDate =
-                m.createdAt &&
-                (!prevCreated || dayKey(prevCreated) !== dayKey(m.createdAt))
-              const artifactId = m.artifact?.id
-              const artifactRows = artifactId ? artifactRowIds.get(artifactId) : undefined
-              const noteRows = noteRowIds.get(m.id)
-              const saveState = artifactId
-                ? {
-                  saved: Boolean(artifactRows),
-                  saving: savingArtifactIds.has(artifactId),
-                  onSave: async () => {
-                    setSavingArtifactIds((prev) => new Set(prev).add(artifactId))
-                    await handleSaveArtifact(m as unknown as GeneratedArtifact)
-                    setSavingArtifactIds((prev) => {
-                      const next = new Set(prev)
-                      next.delete(artifactId)
-                      return next
-                    })
-                  },
-                  onRemove: () =>
-                    handleUnsave(artifactRows ?? [], artifactId, setSavingArtifactIds),
-                }
-                : undefined
-              return (
-                <React.Fragment key={m.id}>
-                {showDate && <DateSeparator iso={m.createdAt!} />}
-                <div
-                  data-message-id={m.id}
+          {chatId && (
+            <div className="absolute right-4 top-3 z-20 flex items-center gap-2">
+              <CreateArtifactMenu onCreate={handleCreateArtifact} />
+              <Tooltip>
+                <TooltipTrigger
+                  onClick={togglePinnedPanel}
+                  aria-label={`Pinned messages (${pinnedMessages.length})`}
+                  aria-pressed={artifactsOpen && panelTab === "pinned"}
                   className={cn(
-                    "-mx-3 rounded-2xl px-3 py-1 transition-colors duration-700",
-                    highlightId === m.id && "bg-yellow-100/70 dark:bg-yellow-500/15",
+                    "relative flex size-9 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground",
+                    artifactsOpen && panelTab === "pinned" && "bg-muted text-foreground",
                   )}
                 >
-                <MessageBubble
-                  message={m}
-                  artifactSaveState={saveState}
-                  noteState={{
-                    saved: Boolean(noteRows),
-                    saving: addingNoteMessageIds.has(m.id),
-                    onAdd: () => handleAddToNotes(m),
-                    onRemove: () =>
-                      handleUnsave(noteRows ?? [], m.id, setAddingNoteMessageIds),
-                  }}
-                  pinState={{
-                    pinned: Boolean(m.pinned),
-                    pending: pinningIds.has(m.id),
-                    onToggle: () =>
-                      handleTogglePin(
-                        { id: m.id, text: m.content, createdAt: m.createdAt },
-                        !m.pinned,
-                      ),
-                  }}
-                  createArtifactState={{
-                    pending: creatingFrom.get(m.id) ?? null,
-                    onCreate: (kind) => void handleCreateFromMessage(m, kind),
-                  }}
-                  chatbotId={chatId}
-                />
-                </div>
-                </React.Fragment>
-              )
-            })}
-            {loadingNewer && (
-              <div className="flex justify-center text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-              </div>
-            )}
-            <div ref={bottomSentinelRef} aria-hidden className="h-px" />
-            {pending && (
-              <MessageBubble
-                message={{ id: "typing", role: "assistant", content: "" }}
-                typing
-                typingLabel={pendingLabel}
-              />
-            )}
-            {error && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
-        {showJumpToLatest && (
-          <button
-            type="button"
-            onClick={jumpToLatest}
-            aria-label="Jump to latest messages"
-            className="absolute bottom-3 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-md hover:bg-muted hover:text-foreground"
+                  <Pin className="size-4" />
+                  {pinnedMessages.length > 0 ? (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#f97316] px-1 text-[10px] font-semibold leading-none text-white tabular-nums">
+                      {pinnedMessages.length > 99 ? "99+" : pinnedMessages.length}
+                    </span>
+                  ) : null}
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="z-50">
+                  {pinnedMessages.length === 0
+                    ? "No pinned messages"
+                    : `${pinnedMessages.length} pinned message${pinnedMessages.length === 1 ? "" : "s"}`}
+                </TooltipContent>
+              </Tooltip>
+              <MessageSearch chatId={chatId} onSelect={jumpToMessage} />
+            </div>
+          )}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex-1 overflow-y-auto [overflow-anchor:none]"
           >
-            <ArrowDown className="size-4" />
-          </button>
-        )}
+            <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-8">
+              <div ref={topSentinelRef} aria-hidden className="h-px" />
+              {loadingOlder && (
+                <div className="flex justify-center text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                </div>
+              )}
+              {!hasMoreBefore && chat?.description && (
+                <p className="text-sm text-[#71717a]">{chat.description}</p>
+              )}
+              {messages.length === 0 && !pending && (
+                emptyState ?? (
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                    Send your first message to get things started.
+                  </div>
+                )
+              )}
+              {messages.map((m, i) => {
+                const prevCreated = messages[i - 1]?.createdAt
+                const showDate =
+                  m.createdAt &&
+                  (!prevCreated || dayKey(prevCreated) !== dayKey(m.createdAt))
+                const artifactId = m.artifact?.id
+                const artifactRows = artifactId ? artifactRowIds.get(artifactId) : undefined
+                const noteRows = noteRowIds.get(m.id)
+                const saveState = artifactId
+                  ? {
+                    saved: Boolean(artifactRows),
+                    saving: savingArtifactIds.has(artifactId),
+                    onSave: async () => {
+                      setSavingArtifactIds((prev) => new Set(prev).add(artifactId))
+                      await handleSaveArtifact(m as unknown as GeneratedArtifact)
+                      setSavingArtifactIds((prev) => {
+                        const next = new Set(prev)
+                        next.delete(artifactId)
+                        return next
+                      })
+                    },
+                    onRemove: () =>
+                      handleUnsave(artifactRows ?? [], artifactId, setSavingArtifactIds),
+                  }
+                  : undefined
+                return (
+                  <React.Fragment key={m.id}>
+                    {showDate && <DateSeparator iso={m.createdAt!} />}
+                    <div
+                      data-message-id={m.id}
+                      className={cn(
+                        "-mx-3 rounded-2xl px-3 py-1 transition-colors duration-700",
+                        highlightId === m.id && "bg-yellow-100/70 dark:bg-yellow-500/15",
+                      )}
+                    >
+                      <MessageBubble
+                        message={m}
+                        artifactSaveState={saveState}
+                        noteState={{
+                          saved: Boolean(noteRows),
+                          saving: addingNoteMessageIds.has(m.id),
+                          onAdd: () => handleAddToNotes(m),
+                          onRemove: () =>
+                            handleUnsave(noteRows ?? [], m.id, setAddingNoteMessageIds),
+                        }}
+                        pinState={{
+                          pinned: Boolean(m.pinned),
+                          pending: pinningIds.has(m.id),
+                          onToggle: () =>
+                            handleTogglePin(
+                              { id: m.id, text: m.content, createdAt: m.createdAt },
+                              !m.pinned,
+                            ),
+                        }}
+                        createArtifactState={{
+                          pending: creatingFrom.get(m.id) ?? null,
+                          onCreate: (kind) => void handleCreateFromMessage(m, kind),
+                        }}
+                        chatbotId={chatId}
+                      />
+                    </div>
+                  </React.Fragment>
+                )
+              })}
+              {loadingNewer && (
+                <div className="flex justify-center text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" />
+                </div>
+              )}
+              <div ref={bottomSentinelRef} aria-hidden className="h-px" />
+              {pending && (
+                <MessageBubble
+                  message={{ id: "typing", role: "assistant", content: "" }}
+                  typing
+                  typingLabel={pendingLabel}
+                />
+              )}
+              {error && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+          {showJumpToLatest && (
+            <button
+              type="button"
+              onClick={jumpToLatest}
+              aria-label="Jump to latest messages"
+              className="absolute bottom-3 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-md hover:bg-muted hover:text-foreground"
+            >
+              <ArrowDown className="size-4" />
+            </button>
+          )}
         </div>
 
         <div className="bg-gradient-to-t from-background via-background to-background/80 px-4 pt-2 pb-5">
@@ -1063,7 +1063,7 @@ export function ChatThread({
             placeholder={composerPlaceholder}
             attachLabel={isDocs ? "Add documents" : undefined}
             // Docs pages take dropped files as documents themselves.
-            dropAnywhere={!isDocs}
+            dropAnywhere={false}
           />
         </div>
       </main>

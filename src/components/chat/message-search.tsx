@@ -110,6 +110,7 @@ export function MessageSearch({
     <div ref={rootRef} className="relative">
       <button
         type="button"
+        data-tour="search-message"
         aria-label="Search messages"
         title="Search messages"
         onClick={() => setOpen((o) => !o)}

@@ -285,14 +285,7 @@ export default function ArtifactFromMessagePage() {
         )}
       </div>
 
-      {artifact.kind === "chart" && (
-        <details className="mt-6 rounded-lg border p-4 text-sm">
-          <summary className="cursor-pointer font-medium">Data</summary>
-          <pre className="mt-3 overflow-x-auto rounded bg-muted/40 p-3 text-xs">
-            {JSON.stringify(artifact.data, null, 2)}
-          </pre>
-        </details>
-      )}
+
     </main>
     </ArtifactDocumentProvider>
   )

@@ -288,6 +288,7 @@ export function Composer({
 
             <textarea
               ref={textareaRef}
+              data-tour="artifact-prompt"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {

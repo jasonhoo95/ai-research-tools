@@ -297,13 +297,7 @@ export function ArtifactBio({
 
   return (
     <div
-      className="-m-2 rounded-xl bg-muted/40 p-3 sm:-m-4 sm:p-6"
-      style={
-        {
-          "--bio-from": bio.palette?.from ?? "#0a66c2",
-          "--bio-to": bio.palette?.to ?? "#004182",
-        } as React.CSSProperties
-      }
+      className="-m-2 p-3 sm:-m-4 sm:p-6"
     >
       <div className="mx-auto grid max-w-5xl gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
         <div className="flex min-w-0 flex-col gap-3">
@@ -404,11 +398,6 @@ export function ArtifactBio({
                   <ul className="flex flex-col gap-2 text-sm font-medium">
                     {bio.highlights.map((highlight, i) => (
                       <li key={i} className="flex items-start gap-2">
-                        <span
-                          className="mt-0.5 size-6 shrink-0 rounded"
-                          style={{ background: gradient }}
-                          aria-hidden
-                        />
                         <span className="min-w-0">{highlight}</span>
                       </li>
                     ))}

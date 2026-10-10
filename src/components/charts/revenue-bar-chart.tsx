@@ -25,13 +25,20 @@ const data = [
 export function RevenueBarChart() {
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+      <BarChart
+        className="outline-none [&_.recharts-surface]:outline-none"
+        style={{ outline: "none" }}
+        data={data}
+        margin={{ top: 8, right: 8, left: -12, bottom: 0 }}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
         <XAxis
           dataKey="month"
           stroke="var(--muted-foreground)"
           fontSize={12}
           tickLine={false}
+          angle={0}
+          textAnchor="middle"
           axisLine={false}
         />
         <YAxis
@@ -42,7 +49,7 @@ export function RevenueBarChart() {
           tickFormatter={(v) => `$${v / 1000}k`}
         />
         <Tooltip
-          cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+          cursor={false}
           contentStyle={{
             background: "var(--popover)",
             border: "1px solid var(--border)",
@@ -52,7 +59,12 @@ export function RevenueBarChart() {
           }}
           formatter={(v) => [`$${Number(v).toLocaleString()}`, "Revenue"]}
         />
-        <Bar dataKey="revenue" fill="var(--primary)" radius={[6, 6, 0, 0]} />
+        <Bar
+          dataKey="revenue"
+          fill="var(--primary)"
+          radius={[6, 6, 0, 0]}
+          activeBar={false}
+        />
       </BarChart>
     </ResponsiveContainer>
   )

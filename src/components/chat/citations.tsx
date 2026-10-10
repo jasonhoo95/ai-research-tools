@@ -34,17 +34,11 @@ function shortDomain(source: CitationSource): string {
 export function Citations({ sources, provider }: Props) {
   if (!sources.length) return null
 
-  const providerLabel = provider === "exa" ? "Exa" : provider === "google" ? "Google" : null
 
   return (
     <div className="mt-3 flex flex-col gap-2 border-t border-current/10 pt-3">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span className="font-semibold uppercase tracking-wider">Sources</span>
-        {providerLabel && (
-          <span className="rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            via {providerLabel}
-          </span>
-        )}
       </div>
       <ol className="flex flex-wrap gap-2 text-xs">
         {sources.map((source, i) => {

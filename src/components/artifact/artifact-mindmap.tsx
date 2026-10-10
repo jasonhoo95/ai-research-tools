@@ -464,10 +464,11 @@ function NodeDetailsSheet({
         {node ? (
           <>
             <SheetHeader>
-              <SheetDescription>
-                Step {step} of {total}
-              </SheetDescription>
-              <SheetTitle render={<div />}>
+
+              <SheetTitle>
+                <p className="text-xs mb-4 font-medium tracking-wide text-muted-foreground uppercase">
+                  Title
+                </p>
                 <Input
                   value={titleDraft}
                   aria-label="Title"
@@ -919,7 +920,7 @@ function MindmapCanvas({
         ref={wrapperRef}
         className="h-full min-h-[560px] overflow-hidden rounded-2xl border border-(--border) bg-(--muted)/30"
       >
-        <ReactFlow<TopicNode, RelationEdge>
+        <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
@@ -948,14 +949,7 @@ function MindmapCanvas({
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="#d4d4d8" />
           <Controls showInteractive={false} position="bottom-left" />
-          <MiniMap
-            position="bottom-right"
-            pannable
-            zoomable
-            nodeColor={(node) => (rootIds.has(node.id) ? ACCENT : "#d4d4d8")}
-            nodeBorderRadius={8}
-            className="!rounded-lg !border !border-(--border) !shadow-sm"
-          />
+
           <Panel position="top-left" className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setAddOpen(true)} className="shadow-sm">
               <Plus className="size-4" />

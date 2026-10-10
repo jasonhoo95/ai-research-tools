@@ -372,7 +372,7 @@ function appendMissingToLayout(
             layout.reduce(
                 (bottom, entry) =>
                     column >= entry.x &&
-                    column < entry.x + entry.w
+                        column < entry.x + entry.w
                         ? Math.max(
                             bottom,
                             entry.y + entry.h,
@@ -540,7 +540,6 @@ function PinCard({
         // drop-shadow filter on this wrapper because the card itself is
         // clipped (box-shadow would be clipped with it).
         <div
-            onMouseLeave={() => setConfirmingDelete(false)}
             className={cn(
                 "group/pin relative h-full min-h-0",
                 "[filter:drop-shadow(0_1px_1.5px_rgb(0_0_0/0.10))_drop-shadow(0_4px_10px_rgb(0_0_0/0.05))]",
@@ -556,114 +555,101 @@ function PinCard({
                     "[clip-path:polygon(0_0,calc(100%-var(--note-fold))_0,100%_var(--note-fold),100%_100%,0_100%)]",
                 )}
             >
-            {/* Header — keep clear of the folded corner */}
-            <div className="flex shrink-0 items-start pr-4">
-                <span
-                    ref={labelRef}
-                    contentEditable={isEditing}
-                    suppressContentEditableWarning
-                    onClick={handleFocus}
-                    onBlur={handleBlur}
+                {/* Header — keep clear of the folded corner */}
+                <div className="flex shrink-0 items-start pr-4">
+                    <span
+                        ref={labelRef}
+                        contentEditable={isEditing}
+                        suppressContentEditableWarning
+                        onClick={handleFocus}
+                        onBlur={handleBlur}
+                        onMouseDown={(event) =>
+                            event.stopPropagation()
+                        }
+                        onKeyDown={(event) =>
+                            event.stopPropagation()
+                        }
+                        className={cn(
+                            "min-w-0 flex-1",
+                            "whitespace-pre-wrap",
+                            "break-words",
+                            "text-base font-semibold leading-snug",
+                            "outline-none",
+                            !isEditing &&
+                            "cursor-text",
+                        )}
+                    />
+                </div>
+
+                {/* Slate editor */}
+                <div
+                    className={cn(
+                        "mt-2 min-h-0 flex-1",
+                        "overflow-y-auto",
+                    )}
                     onMouseDown={(event) =>
                         event.stopPropagation()
                     }
-                    onKeyDown={(event) =>
+                    onPointerDown={(event) =>
                         event.stopPropagation()
                     }
-                    className={cn(
-                        "min-w-0 flex-1",
-                        "whitespace-pre-wrap",
-                        "break-words",
-                        "text-base font-semibold leading-snug",
-                        "outline-none",
-                        !isEditing &&
-                        "cursor-text",
-                    )}
-                />
-            </div>
-
-            {/* Slate editor */}
-            <div
-                className={cn(
-                    "mt-2 min-h-0 flex-1",
-                    "overflow-y-auto",
-                )}
-                onMouseDown={(event) =>
-                    event.stopPropagation()
-                }
-                onPointerDown={(event) =>
-                    event.stopPropagation()
-                }
-            >
-                <SlateEditor
-                    key={item.id}
-                    value={body}
-                    onChange={
-                        handleBodyChange
-                    }
-                    placeholder="Add notes…"
-                    showToolbar={false}
-                    className={cn(
-                        "rounded-lg border-0",
-                        "bg-transparent",
-                        "shadow-none",
-                    )}
-                    editableClassName={cn(
-                        "prose prose-sm",
-                        "max-w-none",
-                        "px-0 py-1",
-                        "min-h-[72px]",
-                        "outline-none",
-                        "text-sm leading-relaxed",
-                        "text-(--note-ink)/85",
-                        "[&_:is(h1,h2,h3,strong,a)]:text-(--note-ink)",
-                        "[&_h1]:text-lg",
-                        "[&_h2]:text-base",
-                        // Bullets as hollow circles, like a checklist.
-                        "[&_ul]:list-none [&_ul]:pl-0",
-                        "[&_ul>li]:relative [&_ul>li]:my-1 [&_ul>li]:pl-6",
-                        "[&_ul>li]:before:absolute [&_ul>li]:before:left-0 [&_ul>li]:before:top-[0.3em]",
-                        "[&_ul>li]:before:size-3.5 [&_ul>li]:before:rounded-full [&_ul>li]:before:content-['']",
-                        "[&_ul>li]:before:border-[1.5px] [&_ul>li]:before:border-(--note-ink)/40",
-                    )}
-                />
-            </div>
+                >
+                    <SlateEditor
+                        key={item.id}
+                        value={body}
+                        onChange={
+                            handleBodyChange
+                        }
+                        placeholder="Add notes…"
+                        showToolbar={false}
+                        className={cn(
+                            "rounded-lg border-0",
+                            "bg-transparent",
+                            "shadow-none",
+                        )}
+                        editableClassName={cn(
+                            "prose prose-sm",
+                            "max-w-none",
+                            "px-0 py-1",
+                            "min-h-[72px]",
+                            "outline-none",
+                            "text-sm leading-relaxed",
+                            "text-(--note-ink)/85",
+                            "[&_:is(h1,h2,h3,strong,a)]:text-(--note-ink)",
+                            "[&_h1]:text-lg",
+                            "[&_h2]:text-base",
+                            // Bullets as hollow circles, like a checklist.
+                            "[&_ul]:list-none [&_ul]:pl-0",
+                            "[&_ul>li]:relative [&_ul>li]:my-1 [&_ul>li]:pl-6",
+                            "[&_ul>li]:before:absolute [&_ul>li]:before:left-0 [&_ul>li]:before:top-[0.3em]",
+                            "[&_ul>li]:before:size-3.5 [&_ul>li]:before:rounded-full [&_ul>li]:before:content-['']",
+                            "[&_ul>li]:before:border-[1.5px] [&_ul>li]:before:border-(--note-ink)/40",
+                        )}
+                    />
+                </div>
             </div>
 
             {/* Hover controls, tucked under the fold so they don't take
                 title space: delete, then the drag handle. */}
             <div className="absolute right-1 top-[calc(var(--note-fold)+2px)] z-10 flex flex-col items-center gap-0.5">
-                {onRemove ? (
-                    <button
-                        type="button"
-                        aria-label={
-                            confirmingDelete
-                                ? `Confirm delete ${item.label ?? "note"}`
-                                : `Delete ${item.label ?? "note"}`
-                        }
-                        title={
-                            confirmingDelete
-                                ? "Click again to delete"
-                                : "Delete note"
-                        }
-                        onMouseDown={(event) =>
-                            event.stopPropagation()
-                        }
-                        onClick={() => {
-                            if (confirmingDelete) onRemove()
-                            else setConfirmingDelete(true)
-                        }}
-                        className={cn(
-                            "rounded-md p-1 transition-[opacity,color,background-color]",
-                            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--note-ink)/30",
-                            confirmingDelete
-                                ? "bg-red-600 text-white opacity-100 shadow-sm hover:bg-red-700"
-                                : "bg-(--note-bg) text-(--note-ink) opacity-0 group-hover/pin:opacity-60 hover:!opacity-100 hover:bg-red-50 hover:text-red-600",
-                        )}
-                    >
-                        <Trash2 className="pointer-events-none size-4" />
-                    </button>
-                ) : null}
+                <button
+                    type="button"
+
+
+                    onMouseDown={(event) =>
+                        event.stopPropagation()
+                    }
+                    onClick={() => {
+                        onRemove()
+                    }}
+                    className={cn(
+                        "rounded-md p-1 transition-[opacity,color,background-color] bg-(--note-bg) text-(--note-ink) opacity-0 group-hover/pin:opacity-60 hover:!opacity-100  hover:text-red-600",
+                        "focus-visible:opacity-100 opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--note-ink)/30",
+
+                    )}
+                >
+                    <Trash2 className="pointer-events-none size-4" />
+                </button>
 
                 {/* Do not stopPropagation here; RGL needs the mousedown. */}
                 <div
@@ -1065,9 +1051,9 @@ export function NotesGrid({
                                             onRemove={
                                                 onRemoveItem
                                                     ? () =>
-                                                          onRemoveItem(
-                                                              item.id,
-                                                          )
+                                                        onRemoveItem(
+                                                            item.id,
+                                                        )
                                                     : undefined
                                             }
                                         />

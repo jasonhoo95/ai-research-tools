@@ -42,7 +42,6 @@ const mainNav = [
   { href: "/details", label: "Task", icon: ListTodo },
   { href: "/chat", label: "Inbox", icon: Inbox },
   { href: "/docs", label: "Docs", icon: FileSearch },
-  { href: "/dashboard", label: "Calendar", icon: Calendar },
 ]
 
 export function AppSidebar() {

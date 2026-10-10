@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, MessageSquarePlus } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 import { NewChatDialog, type NewChatValues } from "@/components/chat/new-chat-dialog"
+import { OnboardingReplayButton } from "@/components/onboarding/onboarding-replay-button"
 import { chatRepo } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
 
@@ -98,18 +99,22 @@ export function AppTopbar() {
           ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          className={cn(
-            "inline-flex h-9 items-center gap-2 rounded-xl bg-[#f97316] px-4 text-sm font-medium text-white",
-            "shadow-[0_4px_14px_rgba(249,115,22,0.35)] transition-colors hover:bg-[#ea580c]"
-          )}
-        >
-          <MessageSquarePlus className="size-4" />
-          New
-          <ChevronDown className="size-3.5 opacity-80" />
-        </button>
+        <div className="flex items-center gap-2">
+          <OnboardingReplayButton />
+          <button
+            type="button"
+            data-tour="new-chat"
+            onClick={() => setDialogOpen(true)}
+            className={cn(
+              "inline-flex h-9 items-center gap-2 rounded-xl bg-[#f97316] px-4 text-sm font-medium text-white",
+              "shadow-[0_4px_14px_rgba(249,115,22,0.35)] transition-colors hover:bg-[#ea580c]"
+            )}
+          >
+            <MessageSquarePlus className="size-4" />
+            New
+            <ChevronDown className="size-3.5 opacity-80" />
+          </button>
+        </div>
       </header>
 
       <NewChatDialog
