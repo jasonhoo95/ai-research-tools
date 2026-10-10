@@ -640,7 +640,7 @@ function PinCard({
                         event.stopPropagation()
                     }
                     onClick={() => {
-                        onRemove()
+                        onRemove?.()
                     }}
                     className={cn(
                         "rounded-md p-1 transition-[opacity,color,background-color] bg-(--note-bg) text-(--note-ink) opacity-0 group-hover/pin:opacity-60 hover:!opacity-100  hover:text-red-600",

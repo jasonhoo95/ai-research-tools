@@ -174,7 +174,10 @@ export function ChatThread({
   onPanelOpenChange,
 }: ChatThreadProps) {
   const isDocs = variant === "docs"
-  const [noteDialogOpen, setNoteDialogOpen] = useState({
+  const [noteDialogOpen, setNoteDialogOpen] = useState<{
+    open: boolean
+    content: GeneratedArtifact | null
+  }>({
     open: false,
     content: null,
   })
@@ -802,7 +805,9 @@ export function ChatThread({
     console.log(query, "query content")
     setNoteDialogOpen({
       open: true,
-      content: query,
+      // A chat message reshaped as a notes artifact; it isn't a full
+      // GeneratedArtifact (no prompt), which the save endpoint accepts.
+      content: query as unknown as GeneratedArtifact,
     })
 
   }
@@ -848,6 +853,7 @@ export function ChatThread({
 
 
   const handleSubmitNote = async (data: AddNoteValues) => {
+    if (!noteDialogOpen.content) return
     const datas = {
       ...noteDialogOpen.content,
       artifact: {
