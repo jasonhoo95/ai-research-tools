@@ -38,7 +38,7 @@ export default function ChatListPage() {
   // screen while it's refreshed.
   React.useEffect(() => {
     const { chatList: saved, saveChatList } = useChatThreadStore.getState()
-    if (saved && Date.now() - saved.fetchedAt < THREAD_FRESH_MS) return
+    if (saved) return
     let alive = true
     chatRepo
       .listChats()
