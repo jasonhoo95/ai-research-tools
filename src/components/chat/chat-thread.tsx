@@ -22,6 +22,11 @@ import type {
 } from "@/lib/chat-types"
 import { artifactKindLabel } from "@/lib/artifact-labels"
 import { artifactsStore } from "@/lib/artifacts-store"
+import {
+  THREAD_FRESH_MS,
+  useChatThreadStore,
+  type ThreadSnapshot,
+} from "@/store/chat-thread-store"
 import { normalizeGeneratedArtifact } from "@/lib/artifact-chat-row"
 import {
   appendNoteToNotesboard,
@@ -94,6 +99,18 @@ function countLinks(text: string) {
 }
 
 const PAGE_SIZE = 10
+/** Messages kept in a thread's saved snapshot (the latest ones). */
+const SNAPSHOT_MESSAGES = 60
+
+/** The backend's page cursor for a message: base64url of "created_at|id". */
+function messageCursor(message: ChatBubbleMessage): string | null {
+  if (!message.createdAt) return null
+  const bytes = new TextEncoder().encode(`${message.createdAt}|${message.id}`)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "")
+}
 /** Distance (px) from an edge at which the next page starts loading. */
 const LOAD_MARGIN_PX = 300
 const HIGHLIGHT_MS = 2000
@@ -394,7 +411,19 @@ export function ChatThread({
     setScrollTarget({ kind: "bottom", smooth: !hasMoreAfter })
   }
 
-  async function fetchAll() {
+  // For the saved snapshot (below): whether an answer is on its way, and
+  // when the thread was last loaded from the server.
+  const pendingRef = React.useRef(false)
+  const fetchedAtRef = React.useRef(0)
+  useEffect(() => {
+    pendingRef.current = pending
+  }, [pending])
+
+  /**
+   * Load the chat from the server. `background`: a saved snapshot is already
+   * showing, so don't move the view, and keep what the user just did.
+   */
+  async function fetchAll({ background = false } = {}) {
     const [c, page, artifacts, pinned] = await Promise.all([
       chatRepo.getChat(chatId),
       chatRepo.listMessages(chatId, { limit: PAGE_SIZE }),
@@ -402,9 +431,13 @@ export function ChatThread({
       chatRepo.listPinnedMessages(chatId).catch(() => []),
     ])
     if (!c) {
+      useChatThreadStore.getState().remove(chatId)
       setNotFound(true)
       return
     }
+    // A question sent meanwhile: its answer brings the thread up to date.
+    if (background && pendingRef.current) return
+    fetchedAtRef.current = Date.now()
     setChat(c)
     applyWindow(page)
     setPinnedMessages(
@@ -414,7 +447,7 @@ export function ChatThread({
         createdAt: row.created_at,
       })),
     )
-    setScrollTarget({ kind: "bottom", smooth: false })
+    if (!background) setScrollTarget({ kind: "bottom", smooth: false })
 
     setPinnedArtifacts(artifacts)
     // Warm the local artifact cache so /artifacts/[id] can open them
@@ -425,11 +458,70 @@ export function ChatThread({
     setLoading(false)
   }
 
-  useEffect(() => {
-    (async () => {
-      await fetchAll()
-    })()
+  /** Show a saved snapshot of this thread right away. */
+  const applySnapshot = (snapshot: ThreadSnapshot) => {
+    windowGenRef.current++
+    prependAnchorRef.current = null
+    fetchedAtRef.current = snapshot.fetchedAt
+    setChat(snapshot.chat)
+    setMessages(snapshot.messages)
+    setHasMoreBefore(snapshot.hasMoreBefore)
+    setHasMoreAfter(false)
+    beforeCursorRef.current = snapshot.beforeCursor
+    afterCursorRef.current = null
+    setPinnedMessages(snapshot.pinned)
+    setPinnedArtifacts(snapshot.artifacts)
+    for (const row of snapshot.artifacts) {
+      if (row.content) artifactsStore.save(row.content)
+    }
+    setScrollTarget({ kind: "bottom", smooth: false })
+    setLoading(false)
+  }
+
+  // Opened before: show it at once from the saved snapshot, and only ask the
+  // server again once that is older than THREAD_FRESH_MS. A layout effect,
+  // so the snapshot is on screen before the first paint.
+  React.useLayoutEffect(() => {
+    const snapshot = useChatThreadStore.getState().threads[chatId]
+    if (snapshot) {
+      // The snapshot lives in localStorage, which only exists in the browser:
+      // reading it during render would differ from the server's render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      applySnapshot(snapshot)
+      if (Date.now() - snapshot.fetchedAt < THREAD_FRESH_MS) return
+    }
+    void fetchAll({ background: Boolean(snapshot) }).catch((err: Error) => {
+      if (!snapshot) setError(err.message)
+    })
   }, [chatId])
+
+  // Keep the snapshot in step with what the thread shows: sent messages,
+  // pins, artifacts. Skipped while an answer is pending (the question would
+  // be saved without it) and while viewing older history from a search.
+  useEffect(() => {
+    if (loading || !chat || pending || hasMoreAfter) return
+    const trimmed = messages.length > SNAPSHOT_MESSAGES
+    const kept = trimmed ? messages.slice(-SNAPSHOT_MESSAGES) : messages
+    const cursor = trimmed ? messageCursor(kept[0]) : beforeCursorRef.current
+    useChatThreadStore.getState().save(chatId, {
+      chat,
+      messages: kept,
+      hasMoreBefore: trimmed ? Boolean(cursor) : hasMoreBefore,
+      beforeCursor: cursor,
+      artifacts: pinnedArtifacts,
+      pinned: pinnedMessages,
+      fetchedAt: fetchedAtRef.current,
+    })
+  }, [chatId, chat, messages, hasMoreBefore, hasMoreAfter, pinnedArtifacts, pinnedMessages, loading, pending])
+
+  // Left while an answer was still coming: the snapshot lacks it, so load
+  // from the server next time.
+  useEffect(
+    () => () => {
+      if (pendingRef.current) useChatThreadStore.getState().remove(chatId)
+    },
+    [chatId],
+  )
 
   const noteForm = useForm<AddNoteValues>({
     resolver: zodResolver(addNoteSchema),

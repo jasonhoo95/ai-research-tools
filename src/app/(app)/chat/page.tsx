@@ -7,6 +7,7 @@ import { MessageSquare, Trash2 } from "lucide-react"
 
 import { NewChatDialog, type NewChatValues } from "@/components/chat/new-chat-dialog"
 import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
+import { useChatThreadStore } from "@/store/chat-thread-store"
 
 function formatRelative(iso: string) {
   const d = new Date(iso)
@@ -57,6 +58,7 @@ export default function ChatListPage() {
     if (!confirm("Delete this chat and all its messages?")) return
     try {
       await chatRepo.deleteChat(id)
+      useChatThreadStore.getState().remove(id)
       setChats((prev) => (prev ? prev.filter((c) => c.id !== id) : prev))
     } catch (err) {
       setError((err as Error).message)
