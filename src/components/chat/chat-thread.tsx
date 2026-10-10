@@ -93,7 +93,7 @@ function countLinks(text: string) {
   return new Set(text.match(/\bhttps?:\/\/[^\s<>"'`]+|\bwww\.[a-z0-9-]+\.[a-z]/gi) ?? []).size
 }
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = 10
 /** Distance (px) from an edge at which the next page starts loading. */
 const LOAD_MARGIN_PX = 300
 const HIGHLIGHT_MS = 2000
