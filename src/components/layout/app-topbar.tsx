@@ -50,26 +50,20 @@ export function AppTopbar() {
   const pathname = usePathname()
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [chatTitle, setChatTitle] = useState<string | null>(null)
 
   const chatIdMatch = pathname.match(/^\/chat\/([^/]+)$/)
   const chatId = chatIdMatch?.[1]
 
-  useEffect(() => {
-    if (!chatId) {
-      setChatTitle(null)
-      return
-    }
-    chatRepo
-      .getChat(chatId)
-      .then((chat) => setChatTitle(chat?.title ?? null))
-      .catch(() => setChatTitle(null))
+  const chatTitle = useMemo(() => {
+    const { chatList } = useChatThreadStore.getState();
+
+    const chatMatch = chatList?.rows.find((o) => o.id === chatId);
+
+    return chatMatch?.title
+
   }, [chatId])
 
-  const crumbs = useMemo(
-    () => buildCrumbs(pathname, chatTitle),
-    [pathname, chatTitle]
-  )
+
 
   const handleCreate = async (values: NewChatValues) => {
     const row = await chatRepo.createChat(values)
@@ -78,27 +72,15 @@ export function AppTopbar() {
     router.push(`/chat/${row.id}`)
   }
 
+
   return (
     <>
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-[#ececef] bg-white px-6">
         <nav className="flex min-w-0 items-center gap-1.5 text-sm">
-          {crumbs.map((crumb, index) => (
-            <div key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-1.5">
-              {index > 0 && (
-                <ChevronRight className="size-3.5 shrink-0 text-[#c4c4cc]" />
-              )}
-              {crumb.href ? (
-                <Link
-                  href={crumb.href}
-                  className="truncate text-[#a1a1aa] transition-colors hover:text-[#52525b]"
-                >
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span className="truncate font-medium text-[#27272a]">{crumb.label}</span>
-              )}
-            </div>
-          ))}
+          <h2 className="text-xl font-semibold">
+            {chatTitle}
+
+          </h2>
         </nav>
 
         <div className="flex items-center gap-2">
