@@ -24,7 +24,6 @@ export type ThreadSnapshot = {
 	artifacts: ArtifactChatRow[];
 	pinned: PinnedMessageItem[];
 	/** When it was last loaded from the server. */
-	fetchedAt: number;
 	/** When it was last opened or changed, for evicting the oldest. */
 	usedAt: number;
 };
@@ -34,7 +33,6 @@ export type ChatListSnapshot = {
 	/** Every kind (chats and docs workspaces), newest first. */
 	rows: ChatRow[];
 	/** When it was last loaded from the server. */
-	fetchedAt: number;
 };
 
 /**
@@ -58,7 +56,10 @@ type ChatThreadStore = {
 	/** A chat created or changed: added to the top, or updated in place. */
 	upsertChat: (row: ChatRow) => void;
 	/** A message was sent in a chat: the list shows it updated just now. */
-	touchChat: (chatId: string, updatedAt?: string) => void;
+	touchChat: (
+		chatId: string,
+		updatedAt?: string,
+	) => void;
 	/** A chat was deleted: forget its thread and drop it from the list. */
 	remove: (chatId: string) => void;
 	clear: () => void;
@@ -160,24 +161,35 @@ export const useChatThreadStore =
 					set({
 						chatList: {
 							rows,
-							fetchedAt: Date.now(),
 						},
 					}),
 				upsertChat: (row) =>
 					set((state) => {
-						if (!state.chatList) return state;
-						const { rows } = state.chatList;
+						if (!state.chatList)
+							return state;
+						const { rows } =
+							state.chatList;
 						const known = rows.some(
-							(r) => r.id === row.id,
+							(r) =>
+								r.id === row.id,
 						);
 						return {
 							chatList: {
 								...state.chatList,
 								rows: known
-									? rows.map((r) =>
-											r.id === row.id ? row : r,
+									? rows.map(
+											(
+												r,
+											) =>
+												r.id ===
+												row.id
+													? row
+													: r,
 										)
-									: [row, ...rows],
+									: [
+											row,
+											...rows,
+										],
 							},
 						};
 					}),
@@ -186,14 +198,21 @@ export const useChatThreadStore =
 					updatedAt = new Date().toISOString(),
 				) =>
 					set((state) => {
-						if (!state.chatList) return state;
+						if (!state.chatList)
+							return state;
 						return {
 							chatList: {
 								...state.chatList,
-								rows: state.chatList.rows.map((r) =>
-									r.id === chatId
-										? { ...r, updated_at: updatedAt }
-										: r,
+								rows: state.chatList.rows.map(
+									(r) =>
+										r.id ===
+										chatId
+											? {
+													...r,
+													updated_at:
+														updatedAt,
+												}
+											: r,
 								),
 							},
 						};
@@ -206,16 +225,22 @@ export const useChatThreadStore =
 						delete threads[chatId];
 						return {
 							threads,
-							chatList: state.chatList && {
-								...state.chatList,
-								rows: state.chatList.rows.filter(
-									(r) => r.id !== chatId,
-								),
-							},
+							chatList:
+								state.chatList && {
+									...state.chatList,
+									rows: state.chatList.rows.filter(
+										(r) =>
+											r.id !==
+											chatId,
+									),
+								},
 						};
 					}),
 				clear: () =>
-					set({ threads: {}, chatList: null }),
+					set({
+						threads: {},
+						chatList: null,
+					}),
 			}),
 			{
 				name: "chat-threads",

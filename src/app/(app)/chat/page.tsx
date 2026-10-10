@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { MessageSquare, Trash2 } from "lucide-react"
@@ -31,26 +32,27 @@ export default function ChatListPage() {
     () => chatList?.rows.filter(isPlainChat) ?? null,
     [chatList],
   )
+
+  console.log(chats, "chats all");
   const [error, setError] = React.useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = React.useState(false)
 
   // Load the list unless the saved one is recent; an older one stays on
   // screen while it's refreshed.
-  React.useEffect(() => {
+  useEffect(() => {
     const { chatList: saved, saveChatList } = useChatThreadStore.getState()
+    console.log(saved, "saved rows");
     if (saved) return
-    let alive = true
     chatRepo
       .listChats()
       .then((rows) => {
-        if (alive) saveChatList(rows)
+        console.log(rows, "rows");
+        saveChatList(rows)
       })
       .catch((err: Error) => {
-        if (alive && !saved) setError(err.message)
+        if (!saved) setError(err.message)
       })
-    return () => {
-      alive = false
-    }
+
   }, [])
 
   const handleCreate = async (values: NewChatValues) => {

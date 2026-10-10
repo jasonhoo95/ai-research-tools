@@ -14,7 +14,7 @@ import {
   LogOut,
   Search,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -30,6 +30,7 @@ import { fetchCurrentUser, logout } from "@/lib/auth-client"
 import type { AuthUser } from "@/lib/auth-session"
 import { chatRepo, isPlainChat, type ChatRow } from "@/lib/chat-repo"
 import { cn } from "@/lib/utils"
+import { useChatThreadStore } from "@/store/chat-thread-store"
 
 function initials(user: AuthUser | null) {
   const source = user?.name || user?.email || ""
@@ -48,8 +49,17 @@ export function AppSidebar() {
   const pathname = usePathname()
   const [recentOpen, setRecentOpen] = useState(true)
   const [foldersOpen, setFoldersOpen] = useState(true)
-  const [recentChats, setRecentChats] = useState<ChatRow[]>([])
   const [user, setUser] = useState<AuthUser | null>(null)
+  const chatList = useChatThreadStore((s) => s.chatList)
+  const { chatList: saved, saveChatList } = useChatThreadStore.getState()
+
+  const recentChats = useMemo(() => {
+    if (!saved) return [];
+    return saved.rows;
+
+  }, [saved])
+
+  console.log(recentChats, "Recent chats");
 
   useEffect(() => {
     fetchCurrentUser()
@@ -58,10 +68,16 @@ export function AppSidebar() {
   }, [])
 
   useEffect(() => {
+    if (saved) return;
     chatRepo
       .listChats()
-      .then((rows) => setRecentChats(rows.filter(isPlainChat)))
-      .catch(() => setRecentChats([]))
+      .then((rows) => {
+        saveChatList(rows.filter(isPlainChat))
+
+      })
+      .catch(() => {
+        return false;
+      })
   }, [pathname])
 
   return (
