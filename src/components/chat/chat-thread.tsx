@@ -462,7 +462,6 @@ export function ChatThread({
   const applySnapshot = (snapshot: ThreadSnapshot) => {
     windowGenRef.current++
     prependAnchorRef.current = null
-    fetchedAtRef.current = snapshot.fetchedAt
     setChat(snapshot.chat)
     setMessages(snapshot.messages)
     setHasMoreBefore(snapshot.hasMoreBefore)
@@ -488,7 +487,6 @@ export function ChatThread({
       // reading it during render would differ from the server's render.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       applySnapshot(snapshot)
-      if (Date.now() - snapshot.fetchedAt < THREAD_FRESH_MS) return
     }
     void fetchAll({ background: Boolean(snapshot) }).catch((err: Error) => {
       if (!snapshot) setError(err.message)
@@ -510,7 +508,6 @@ export function ChatThread({
       beforeCursor: cursor,
       artifacts: pinnedArtifacts,
       pinned: pinnedMessages,
-      fetchedAt: fetchedAtRef.current,
     })
   }, [chatId, chat, messages, hasMoreBefore, hasMoreAfter, pinnedArtifacts, pinnedMessages, loading, pending])
 
@@ -601,9 +598,7 @@ export function ChatThread({
     setShowJumpToLatest(hasMoreAfter || fromBottom > 400)
   }
 
-  React.useEffect(() => {
-    if (hasMoreAfter) setShowJumpToLatest(true)
-  }, [hasMoreAfter])
+
 
   const send = async (text: string, files: File[]) => {
     if (!chatId) return
